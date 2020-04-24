@@ -15,7 +15,7 @@ class EEGPrep(object):
         Parameters
         ----------
         eeg_path : str, path object
-            A valid string path pointing to a stored .bdf file.
+            A valid string path pointing to a stored .bdf or .fif file.
 
         trigger_dict : dict of {str : int}
             A dictionary in which keys are labels for the triggered events,
@@ -33,7 +33,10 @@ class EEGPrep(object):
         self.trigger_dict = trigger_dict
 
         # import data
-        self.raw = mne.io.read_raw_edf(self.eeg_path, preload=True)
+        if eeg_path.endswith('.bdf'):
+            self.raw = mne.io.read_raw_edf(self.eeg_path, preload=True)
+        elif eeg_path.endswith('.fif'):
+            self.raw = mne.io.read_raw_fif(self.eeg_path, preload=True)
 
     def fix_channels(self, montage_path, n_ext_channels, ext_ch_mapping=None):
         """
@@ -58,8 +61,10 @@ class EEGPrep(object):
         """
 
         if ext_ch_mapping is None:
+            # TODO (Kevin): Add a warning that you're using the default mapping
+            # TODO (Kevin): Put the default mapping as a note in the docstring
             ext_ch_mapping = {'FT10': 'eog', 'PO10': 'eog', 'HeRe': 'eog', 'HeLi': 'emg', 'VeUp': 'emg', 'VeDo': 'emg',
-                            'EMG1a': 'emg', 'Status': 'resp'}  # TODO: discuss
+                            'EMG1a': 'emg', 'Status': 'resp'}
             n_ext_channels = 9
 
         # Removing superfluous '1-' in ch_names
@@ -145,4 +150,10 @@ class EEGPrep(object):
         """
         pass
 
+    def save_prepared_data(self, save_path):  # TODO (Kevin): Implement
+        pass
+
+
 #TODO: Maybe have a function to plot raw data to files.
+
+# TODO: Upload my data
