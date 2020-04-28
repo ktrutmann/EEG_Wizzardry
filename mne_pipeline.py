@@ -81,10 +81,17 @@ class EEGPrep(object):
         # Set channel types
         self.raw.set_channel_types(mapping=ext_ch_mapping)
 
-    def set_references(self):  # TODO (Peter): Implement
+    def set_references(self, ref_ch = ['PO9', 'FT9']):
         """
         EXPLAIN TO MEEE!!!
         """
+
+        self.raw.set_eeg_reference(ref_channels=ref_ch)
+        self.raw.drop_channels(ref_ch)
+
+        # TODO (Peter): Set bipolar references for EMG & EOG
+        # TODO (Peter): documentation
+
         pass
 
     def find_events(self, **kwargs):
