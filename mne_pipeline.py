@@ -92,18 +92,25 @@ class EEGPrep(object):
 
         print('Fixed channel names, dropped unused channels, changed channel types and set montage.')
 
-    def set_references(self, ref_ch=('PO9', 'FT9')):
+    def set_references(self, bipolar_dict, ref_ch=('PO9', 'FT9'), ):
         """
         EXPLAIN TO MEEE!!!
         """
+
+        bipolar_dict = dict(left_hand=['FT10', 'FT9', 'eog'])
+
+        mne.set_bipolar_reference(self.raw,
+                                  anode=[val[0] for val in bipolar_dict.values()],
+                                  cathode=[val[1] for val in bipolar_dict.values()],
+                                  ch_name=list(bipolar_dict.keys()),
+                                  copy=False)
 
         self.raw.set_eeg_reference(ref_channels=ref_ch)
         self.raw.drop_channels(ref_ch)
 
         # TODO (Peter): Set bipolar references for EMG & EOG
         # TODO (Peter): documentation
-
-        pass
+        # TODO (Peter): See if channel types are propagated when setting bipolar ref. If not: Set channel types again
 
     def find_events(self, **kwargs):
         """
@@ -131,7 +138,8 @@ class EEGPrep(object):
 
         return self.events
 
-    def make_epochs(self, epoch_event_dict, **kwargs):
+    def get_epochs(self, epoch_event_dict, **kwargs):
+        # TODO (Laura): Add event list support here as well
         """
         This method creates the epochs from the events found previously by calling the `make_events` method.
 
@@ -151,7 +159,6 @@ class EEGPrep(object):
         print('Created epochs using the provided event ids and / or labels.')
 
     def get_epochs_df(self, event_labels, events_kws=None, **kwargs):
-        # TODO (Laura): Is it okay to split this?
         """
         Gets epoch data as pandas DataFrames, given a list of event labels
         (for now, just an idea).
@@ -182,6 +189,7 @@ class EEGPrep(object):
         return df
 
     def filters(self):
+        # TODO (Peter): Implement filtering
         """
         EXPLAIN TO MEEE!!!
         """
@@ -234,4 +242,15 @@ class EEGPrep(object):
             file_path_and_name = os.path.join(save_path, file_name.__add__('epochs.fif'))
             self.epochs.save(file_path_and_name)
 
-#TODO: Maybe have a function to plot raw data to files.
+# TODO: Maybe have a function to plot raw data to files.
+# TODO: Method to interpolate bad channels
+# TODO: Method to exclude bad epochs
+
+# TODO (Kevin): Start implementing ICA
+#   - Give option to let ica.find_bads_eog() do the work and/or manually exclude components
+#   - Find a way to only fit ICA on "trial data" (exclude pauses; Make this an option?)
+
+# TODO (Laura): Implement bad_channels methods:
+#   - detect_bad_channels() with your algorithm
+#   - mark_bad_channels() where you plot the data and can click on the bad channels
+#   - interpolate_bad_channels() just a wrapper for the mne method.
