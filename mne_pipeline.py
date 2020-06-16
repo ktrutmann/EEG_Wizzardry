@@ -92,25 +92,33 @@ class EEGPrep(object):
 
         print('Fixed channel names, dropped unused channels, changed channel types and set montage.')
 
-    def set_references(self, bipolar_dict, ref_ch=('PO9', 'FT9'), ):
+    def set_references(self, ref_ch=('PO9', 'FT9'), bipolar_dict=None):
         """
-        EXPLAIN TO MEEE!!!
+        This method rereferences the prepared raw eeg data to the average signal at the Mastoid bones.
+        Further, it sets bipolar references for eog and emg data and creates a new channel for the referenced signal.
+
+        Parameters
+        ----------
+        bipolar_dict: dict, optional
+            A dictionary containing the name of the new channel as key and the to-be-referenced channels as values.
+            dict(EMG_right=['PO10','FT10'],
+                EMG_left=['EMG1b','EMG1a'],
+                EOG_x=['HeRe', 'HeLi'],
+                EOG_y=['VeUp', 'VeDo'])
+
+        ref_ch: list, optional
+            A list, containing the reference channels.
         """
-
-        bipolar_dict = dict(left_hand=['FT10', 'FT9', 'eog'])
-
-        mne.set_bipolar_reference(self.raw,
-                                  anode=[val[0] for val in bipolar_dict.values()],
-                                  cathode=[val[1] for val in bipolar_dict.values()],
-                                  ch_name=list(bipolar_dict.keys()),
-                                  copy=False)
+        if bipolar_dict is not None:
+            mne.set_bipolar_reference(self.raw,
+                                      anode=[val[0] for val in bipolar_dict.values()],
+                                      cathode=[val[1] for val in bipolar_dict.values()],
+                                      ch_name=list(bipolar_dict.keys()),
+                                      copy=False)
 
         self.raw.set_eeg_reference(ref_channels=ref_ch)
         self.raw.drop_channels(ref_ch)
 
-        # TODO (Peter): Set bipolar references for EMG & EOG
-        # TODO (Peter): documentation
-        # TODO (Peter): See if channel types are propagated when setting bipolar ref. If not: Set channel types again
 
     def find_events(self, **kwargs):
         """
