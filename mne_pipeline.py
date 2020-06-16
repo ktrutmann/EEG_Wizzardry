@@ -196,12 +196,23 @@ class EEGPrep(object):
 
         return df
 
-    def filters(self):
-        # TODO (Peter): Implement filtering
+    def filters(self, low_freq = 1/7, high_freq = 128, notch_freq = 50):
         """
-        EXPLAIN TO MEEE!!!
+        This method applies a bandpass filter and a notch filter to the data
+
+        Parameters
+        ----------
+        low_freq: float, optional
+            frequency for high pass filter
+        high_freq: float, optional
+            frequency for low pass filter
+        notch_freq: float, optional
+            freqency for notch filter
         """
-        pass
+        self.raw.filter(l_freq= low_freq, h_freq= high_freq)
+        self.raw.notch_filter(range(notch_freq, high_freq, notch_freq), filter_length='auto',
+                              phase='zero', fir_design='firwin')
+
 
     def save_prepared_data(self, save_path='', file_name='EEG_data', save_events=False, save_epochs=False, **kwargs):
         # TODO (Kevin): Test
