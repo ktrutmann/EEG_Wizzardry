@@ -50,7 +50,7 @@ class EEGPrep(object):
         elif eeg_path.endswith('.fif'):
             self.raw = mne.io.read_raw_fif(self.eeg_path, preload=True)
 
-    def fix_channels(self, montage_path, n_ext_channels, ext_ch_mapping=None):
+    def fix_channels(self, montage_path, n_ext_channels=None, ext_ch_mapping=None):
         """
         Removes the '1-' from the start of the channel names, sets the Montage (telling MNE which electrode went where)
         and sets the type of the additional electrodes. For the fixing of the channel names it is assumed that the
@@ -77,6 +77,7 @@ class EEGPrep(object):
         if ext_ch_mapping is None:
             ext_ch_mapping = {'FT10': 'eog', 'PO10': 'eog', 'HeRe': 'eog', 'HeLi': 'emg', 'VeUp': 'emg', 'VeDo': 'emg',
                               'EMG1a': 'emg', 'Status': 'resp'}
+        if n_ext_channels is None:
             n_ext_channels = 9
             warnings.warn('You are using the default mapping for the extra channels!\n' +
                           'Please make sure it is the correct one for your use case.', UserWarning)
