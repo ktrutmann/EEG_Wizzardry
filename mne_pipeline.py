@@ -2,15 +2,16 @@ import os
 import warnings
 import pickle
 import mne
+import numpy as np
 
 
 class EEGPrep(object):
     """
-    Allows to load EEG data from file, to perform different preprocessing steps
-    and pickle the results or export them as pandas DataFrames.
+    Allows to load EEG data from file, perform different preprocessing steps
+    and save the results for further analysis.
     """
 
-    def __init__(self, eeg_path, trigger_dict):
+    def __init__(self, eeg_path, trigger_dict, participant_identifier=''):
         """
         Initiates the EEGPrep object, given a file path and a trigger dictionary,
         containing the number coding of the trigger to events.
@@ -25,19 +26,23 @@ class EEGPrep(object):
             and their respective values are the trigger
             code number as recorded in the data.
 
+        participant_identifier: str, int
+            Some identifier of the data source. Is used for naming the safed files but can also be left empty.
+
         Attributes
         ----------
         raw : instance of RawEDF
             mne class for raw data.
             See: https://mne.tools/stable/generated/mne.io.Raw.html#mne.io.Raw
-
+        # TODO (Meeting): Call it "participant" or "subject" or something else?
         """
         self.eeg_path = eeg_path
         self.trigger_dict = trigger_dict
+        self.participant_id = participant_identifier
         self.events = None
         self.epochs = None
         self.epochs_pd_df = None
-
+        self.ica = None
 
         # import data
         if eeg_path.endswith('.bdf'):
@@ -73,8 +78,8 @@ class EEGPrep(object):
             ext_ch_mapping = {'FT10': 'eog', 'PO10': 'eog', 'HeRe': 'eog', 'HeLi': 'emg', 'VeUp': 'emg', 'VeDo': 'emg',
                               'EMG1a': 'emg', 'Status': 'resp'}
             n_ext_channels = 9
-            warnings.warn('You are using the default mapping for the extra channels!\nPlease make sure it is '
-                          'the correct one for your use case.', UserWarning)
+            warnings.warn('You are using the default mapping for the extra channels!\n' +
+                          'Please make sure it is the correct one for your use case.', UserWarning)
 
         # Removing superfluous '1-' in ch_names
         for name in self.raw.ch_names[:-1]:
@@ -94,7 +99,7 @@ class EEGPrep(object):
 
     def set_references(self, ref_ch=('PO9', 'FT9'), bipolar_dict=None):
         """
-        This method rereferences the prepared raw eeg data to the average signal at the Mastoid bones.
+        This method re-references the prepared raw eeg data to the average signal at the Mastoid bones.
         Further, it sets bipolar references for eog and emg data and creates a new channel for the referenced signal.
 
         Parameters
@@ -109,16 +114,20 @@ class EEGPrep(object):
         ref_ch: list, optional
             A list, containing the reference channels.
         """
-        if bipolar_dict is not None:
+
+        if isinstance(ref_ch, tuple):
+            ref_ch = list(ref_ch)
+
+        if bipolar_dict is None:
             mne.set_bipolar_reference(self.raw,
                                       anode=[val[0] for val in bipolar_dict.values()],
                                       cathode=[val[1] for val in bipolar_dict.values()],
                                       ch_name=list(bipolar_dict.keys()),
                                       copy=False)
+        # TODO: Check if EOG channels keep their channel type!
 
         self.raw.set_eeg_reference(ref_channels=ref_ch)
         self.raw.drop_channels(ref_ch)
-
 
     def find_events(self, **kwargs):
         """
@@ -143,6 +152,79 @@ class EEGPrep(object):
         """
 
         self.events = mne.find_events(raw=self.raw, **kwargs)
+
+        return self.events
+
+    def remove_artifacts_by_ica(self, fit_on_epochs=False, auto_select_eye_artifacts=False, high_pass_freq=1,
+                                decim=3, reject_list_save_location='', **kwargs):
+        """
+        Uses independent component analysis to remove movement components (primarily eye artifacts).
+        The fitting procedure can either use the complete raw data or the epoched data to exclude the breaks
+        between trials. The exclusions are then however applied to both the raw data and (if it exists) the epoched
+        data.
+
+        Parameters
+        ----------
+        fit_on_epochs: bool
+            Indicates whether the ICA will be fit on the epoched data, thus leaving out the gaps between trials.
+            Default behavior is to use all of the raw data.
+        auto_select_eye_artifacts: bool
+            If set to true the method will use mne's `ica.find_bads_eog` to automatically select which components
+            to remove from the data. Defaults to False (manual selection of which components to remove).
+        high_pass_freq: float, int
+            Before fitting the ICA a high pass filter is applied since the procedure is very sensitive to low
+            frequencies. This value indicates the cutoff frequency. Defaults to 1 Hz.
+        decim: int
+            Determines by how much the data is decimated when fitting the ICA. This maked the process faster as
+            only every n-th sample is used. Defaults to 3.
+        reject_list_save_location: str, None
+            Where to save the list of rejected ICA components. Default is the current directory.
+            Set to None if this list should not be saved.
+        kwargs:
+            Will be passed on to the mne.preprocessing.ICA (for creating the ICA object).
+            For available arguments see https://mne.tools/stable/generated/mne.preprocessing.ICA.html
+
+        Notes
+        -----
+        The mna ICA method excludes segments that have previously been annotated as "bad" from the fitting procedure,
+        so make sure you have excluded segments by hand where the data is completely unusable (e.g. during a sneeze
+        or yawning).
+
+        TODO (Meeting): Discuss whether and how to use the "reject" argument of ICA.fit()
+        TODO: Maybe make it possible to use a "reject component list" as input (for reproducability).
+        TODO (Kevin): Test ica
+        """
+
+        if fit_on_epochs and self.epochs is None:
+            raise AttributeError('No epochs found. You have to create epochs using `get_epochs()` before '
+                                 'you can fit the ICA on them.')
+
+        fit_data = self.epochs if fit_on_epochs else self.raw
+
+        self.ica = mne.preprocessing.ICA(**kwargs)
+        self.ica.fit(fit_data.filter(high_pass_freq, None), decim=decim)
+
+        # Rejecting bad components:
+        if auto_select_eye_artifacts:
+            eog_indices, eog_scores = self.ica.find_bads_eog(fit_data)
+            self.ica.exclude = eog_indices
+            print('Automatically excluding the following components: {}'.format(eog_indices))
+            # TODO (Kevin): Maybe still plot the components?
+        else:
+            self.ica.exclude = []  # TODO (Kevin): Implement manual component removal
+            # TODO (Meeting): Discuss how to enter which components to exclude.
+
+        if reject_list_save_location is not None:
+            np.savetxt(os.path.join(reject_list_save_location,
+                                    'participant_{}_rejected_ICA_components.csv'.format(self.participant_id)),
+                       self.ica.exclude, fmt='%i')
+
+        # Applying the ica
+        if len(self.ica.exclude) > 0:
+            self.ica.apply(self.raw, exclude=self.ica.exclude)
+            if self.epochs is not None:
+                self.ica.apply(self.epochs, exclude=self.ica.exclude)
+
 
     def get_epochs(self, epoch_event_dict, **kwargs):
         # TODO (Laura): Add event list support here as well
@@ -196,7 +278,7 @@ class EEGPrep(object):
 
         return df
 
-    def filters(self, low_freq = 1/7, high_freq = 128, notch_freq = 50):
+    def filters(self, low_freq=1/7, high_freq=128, notch_freq=50):
         """
         This method applies a bandpass filter and a notch filter to the data
 
@@ -207,15 +289,15 @@ class EEGPrep(object):
         high_freq: float, optional
             frequency for low pass filter
         notch_freq: float, optional
-            freqency for notch filter
+            frequency for notch filter
         """
         self.raw.filter(l_freq= low_freq, h_freq= high_freq)
         self.raw.notch_filter(range(notch_freq, high_freq, notch_freq), filter_length='auto',
                               phase='zero', fir_design='firwin')
 
-
     def save_prepared_data(self, save_path='', file_name='EEG_data', save_events=False, save_epochs=False, **kwargs):
         # TODO (Kevin): Test
+        # TODO (Kevin): Include participant id in names
         """
         This method saves the prepared raw data and (optionally) the epochs.
         It can also save the events as a pickle file so it can easily be reused later.
@@ -239,7 +321,7 @@ class EEGPrep(object):
             Will be passed on to the raw.save() method.
         """
 
-        file_path_and_name = os.path.join(save_path, file_name.__add__('prepared_raw.fif'))
+        file_path_and_name = os.path.join(save_path, file_name.__add__('_prepared_raw.fif'))
         self.raw.save(file_path_and_name, **kwargs)
         print('Saved the prepared raw file to {}.'.format(file_path_and_name))
 
@@ -247,7 +329,7 @@ class EEGPrep(object):
             if self.events is None:
                 raise AttributeError('No events to save. Please find them by running the find_events() method first.')
 
-            file_path_and_name = os.path.join(save_path, file_name.__add__('events.pickle'))
+            file_path_and_name = os.path.join(save_path, file_name.__add__('_events.pickle'))
             pickle_file = open(file_path_and_name, 'wb')
             pickle.dump(self.events, pickle_file)
             pickle_file.close()

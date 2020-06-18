@@ -7,7 +7,7 @@ Please add your files with the name format *\<YOUR NAME\>_\<WHAT IT IS\>*. This 
 
 - [X] Fix channel names / reference fixing.
 - [X] Find events
-- [ ] Filter
+- [x] Filter
 - [ ] Find/interpolate bad channels
 - [ ] ICA
 - [ ] Exclude bad epochs
