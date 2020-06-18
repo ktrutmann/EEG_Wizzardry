@@ -32,3 +32,9 @@ def test_pipeline_kev_data():
     eeg_prep.save_prepared_data(save_path=os.path.join('Data', 'prepared'),
                                 file_name='kevin_test_data',
                                 overwrite=True)
+
+def test_pipeline_laura_dat():
+    pass  # TODO (laura): Implement tests
+
+def test_pipeline_peter_dat():
+    pass  # TODO (peter): Implement tests

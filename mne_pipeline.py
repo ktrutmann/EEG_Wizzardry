@@ -34,7 +34,7 @@ class EEGPrep(object):
         raw : instance of RawEDF
             mne class for raw data.
             See: https://mne.tools/stable/generated/mne.io.Raw.html#mne.io.Raw
-        # TODO (Meeting): Call it "participant" or "subject" or something else?
+        TODO (Meeting): Call it "participant" or "subject" or something else?
         """
         self.eeg_path = eeg_path
         self.trigger_dict = trigger_dict
@@ -98,7 +98,7 @@ class EEGPrep(object):
 
         print('Fixed channel names, dropped unused channels, changed channel types and set montage.')
 
-    def set_references(self, ref_ch=('PO9', 'FT9'), bipolar_dict=None):
+    def set_references(self, ref_ch=None, bipolar_dict=None):
         """
         This method re-references the prepared raw eeg data to the average signal at the Mastoid bones.
         Further, it sets bipolar references for eog and emg data and creates a new channel for the referenced signal.
@@ -116,16 +116,15 @@ class EEGPrep(object):
             A list, containing the reference channels.
         """
 
-        if isinstance(ref_ch, tuple):
-            ref_ch = list(ref_ch)
+        if ref_ch is None:
+            ref_ch = ['PO9', 'FT9']
 
-        if bipolar_dict is None:
+        if bipolar_dict is not None:
             mne.set_bipolar_reference(self.raw,
                                       anode=[val[0] for val in bipolar_dict.values()],
                                       cathode=[val[1] for val in bipolar_dict.values()],
                                       ch_name=list(bipolar_dict.keys()),
                                       copy=False)
-        # TODO: Check if EOG channels keep their channel type!
 
         self.raw.set_eeg_reference(ref_channels=ref_ch)
         self.raw.drop_channels(ref_ch)
@@ -194,6 +193,7 @@ class EEGPrep(object):
         TODO (Meeting): Discuss whether and how to use the "reject" argument of ICA.fit()
         TODO: Maybe make it possible to use a "reject component list" as input (for reproducability).
         TODO (Kevin): Test ica
+        TODO (Kevin): Split this into "find_ica_components" and "reject_ICA_components"
         """
 
         if fit_on_epochs and self.epochs is None:
@@ -213,7 +213,7 @@ class EEGPrep(object):
             # TODO (Kevin): Maybe still plot the components?
         else:
             self.ica.exclude = []  # TODO (Kevin): Implement manual component removal
-            # TODO (Meeting): Discuss how to enter which components to exclude.
+            # TODO (Kevin): Get the user to create a list file.
 
         if reject_list_save_location is not None:
             np.savetxt(os.path.join(reject_list_save_location,
@@ -225,7 +225,6 @@ class EEGPrep(object):
             self.ica.apply(self.raw, exclude=self.ica.exclude)
             if self.epochs is not None:
                 self.ica.apply(self.epochs, exclude=self.ica.exclude)
-
 
     def get_epochs(self, epoch_event_dict, **kwargs):
         # TODO (Laura): Add event list support here as well
@@ -246,8 +245,6 @@ class EEGPrep(object):
 
         self.epochs = mne.Epochs(self.raw, events=self.events, event_id=epoch_event_dict, **kwargs)
         print('Created epochs using the provided event ids and / or labels.')
-        
-        
 
     def get_epochs_df(self, event_labels, events_kws=None, **kwargs):
         """
@@ -267,6 +264,7 @@ class EEGPrep(object):
         -------
         df : DataFrame
             A dataframe suitable for usage with other statistical/plotting/analysis packages.
+        TODO (Laura): (For later) Check how this exports "rejected" or "marked as bad" epochs
         """
 
         epochs = mne.Epochs(self.raw,
@@ -356,3 +354,5 @@ class EEGPrep(object):
 #   - detect_bad_channels() with your algorithm
 #   - mark_bad_channels() where you plot the data and can click on the bad channels
 #   - interpolate_bad_channels() just a wrapper for the mne method.
+
+# TODO (Peter): Add a "find_bad_epochs" method (manually and/or automatically)
