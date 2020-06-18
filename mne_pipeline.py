@@ -144,8 +144,6 @@ class EEGPrep(object):
 
         self.events = mne.find_events(raw=self.raw, **kwargs)
 
-        return self.events
-
     def get_epochs(self, epoch_event_dict, **kwargs):
         # TODO (Laura): Add event list support here as well
         """
@@ -165,6 +163,8 @@ class EEGPrep(object):
 
         self.epochs = mne.Epochs(self.raw, events=self.events, event_id=epoch_event_dict, **kwargs)
         print('Created epochs using the provided event ids and / or labels.')
+        
+        
 
     def get_epochs_df(self, event_labels, events_kws=None, **kwargs):
         """
