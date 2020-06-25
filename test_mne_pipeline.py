@@ -34,7 +34,40 @@ def test_pipeline_kev_data():
                                 overwrite=True)
 
 def test_pipeline_laura_dat():
-    pass  # TODO (laura): Implement tests
-
+    events_id = dict(show_options=2,
+                 start_choice=4,
+                 end_choice=8,
+                 feedback=16,
+                 feedback_null=32,
+                 end_trial=64)
+    
+    data_preprocessed = mne_pipeline.EEGPrep(eeg_path = 'Data/raw/laura_raw.fif', trigger_dict = events_id)
+    
+    data_preprocessed.fix_channels(
+        montage_path = '/Users/laurafontanesi/miniconda3/pkgs/mne-0.19.2-py_2/site-packages/mne/channels/data/montages/',
+        ext_ch_mapping = {'FT10': 'eog', 
+                          'PO10': 'eog', 
+                          'HeRe': 'eog', 
+                          'HeLi': 'emg', 
+                          'VeUp': 'emg', 
+                          'VeDo': 'emg',
+                          'EMG1a': 'emg', 
+                          'Status': 'resp'},
+        n_ext_channels = 9)
+    
+    data_preprocessed.set_references(ref_ch = ['FT9', 'PO9'], 
+                                 bipolar_dict = dict(
+                                     eye_horizontal=['PO10', 'FT10'],
+                                     eye_vertical=['HeRe', 'FT10'],
+                                     right_hand=['HeLi', 'VeDo'],
+                                     left_hand=['VeUp', 'EMG1a']))
+    
+    data_preprocessed.filters(low_freq=.1, high_freq=100, notch_freq=50)
+    
+    data_preprocessed.find_events(stim_channel='Status')
+    
+    
+    
+    
 def test_pipeline_peter_dat():
     pass  # TODO (peter): Implement tests
