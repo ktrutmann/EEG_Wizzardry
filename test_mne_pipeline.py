@@ -34,16 +34,15 @@ def test_pipeline_kev_data():
 
 def test_pipeline_laura_dat():
     events_id = dict(show_options=2,
-                 start_choice=4,
-                 end_choice=8,
-                 feedback=16,
-                 feedback_null=32,
-                 end_trial=64)
+                     start_choice=4,
+                     end_choice=8,
+                     feedback=16,
+                     feedback_null=32,
+                     end_trial=64)
     
     data_preprocessed = mne_pipeline.EEGPrep(eeg_path = 'Data/raw/laura_raw.fif', trigger_dict = events_id)
     
     data_preprocessed.fix_channels(
-        montage_path = '/Users/laurafontanesi/miniconda3/pkgs/mne-0.19.2-py_2/site-packages/mne/channels/data/montages/',
         ext_ch_mapping = {'FT10': 'eog', 
                           'PO10': 'eog', 
                           'HeRe': 'eog', 
@@ -65,7 +64,12 @@ def test_pipeline_laura_dat():
     
     data_preprocessed.find_events(stim_channel='Status')
     
-    
+    data_preprocessed.automatic_bad_channel_marking(interpolate=True,
+                                                    threshold_sd_of_mean=40,
+                                                    event_labels=['show_options', 'start_choice', 'feedback'],
+                                                    tmin=-.5,
+                                                    tmax=3)
+    data_preprocessed.find_ica_components()
     
     
 def test_pipeline_peter_dat():

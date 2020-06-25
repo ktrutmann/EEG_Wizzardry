@@ -3,6 +3,7 @@ import warnings
 import pickle
 import mne
 import pandas as pd
+import numpy as np
 
 
 class EEGPrep(object):
@@ -259,35 +260,38 @@ class EEGPrep(object):
                 self.ica.exclude))
             self.ica.apply(self.epochs, exclude=self.ica.exclude, **kwargs)
 
-    def get_epochs(self, epoch_event_dict, **kwargs):
-        # TODO (Laura): Add event list support here as well
+    def get_epochs(self, event_labels, **kwargs):
         """
         This method creates the epochs from the events found previously by calling the `make_events` method.
 
         Parameters
         ----------
-        epoch_event_dict : int, list, dict
-            It is recommended to provide a dictionary with the events label as key and the event id as value.
-            mne can however also handle int or lists.
+        event_labels: array or list
+            Labels corresponding to the events that you want to select.
 
-        kwargs:
-            Will be passed on to the `mne.Epochs` method.
+        kwargs : keyword arguments
+            All keyword arguments are passed to mne.Epochs().
+            See: https://mne.tools/stable/generated/mne.Epochs.html#mne.Epochs.
+
         """
         if self.events is None:
             raise AttributeError('No events found. Please find them by running the find_events() method first.')
 
-        self.epochs = mne.Epochs(self.raw, events=self.events, event_id=epoch_event_dict, **kwargs)
+        self.epochs = mne.Epochs(self.raw, 
+                                 events=self.events, 
+                                 event_id=[self.trigger_dict[event] for event in event_labels], 
+                                 **kwargs)
         print('Created epochs using the provided event ids and / or labels.')
 
-    def get_epochs_df(self, event_labels, events_kws=None, **kwargs):
+    def get_epochs_df(self, event_labels, **kwargs):
+        # TODO (Laura): (For later) Check how this exports "rejected" or "marked as bad" epochs
         """
-        Gets epoch data as pandas DataFrames, given a list of event labels
-        (for now, just an idea).
+        Gets epoch data as pandas DataFrames, given a list of event labels.
 
         Parameters
         ----------
-        events_kws : dict, optional
-            Additional arguments to find_events.
+        event_labels: array or list
+            Labels corresponding to the events that you want to select.
 
         kwargs : keyword arguments
             All keyword arguments are passed to mne.Epochs().
@@ -297,11 +301,13 @@ class EEGPrep(object):
         -------
         df : DataFrame
             A dataframe suitable for usage with other statistical/plotting/analysis packages.
-        TODO (Laura): (For later) Check how this exports "rejected" or "marked as bad" epochs
+
         """
+        if self.events is None:
+            raise AttributeError('No events found. Please find them by running the find_events() method first.')
 
         epochs = mne.Epochs(self.raw,
-                            events=self.find_events(**events_kws),
+                            events=self.events,
                             event_id=[self.trigger_dict[event] for event in event_labels],
                             **kwargs)
 
@@ -369,6 +375,33 @@ class EEGPrep(object):
 
             file_path_and_name = os.path.join(save_path, '{}_epochs.fif'.format(self.participant_id))
             self.epochs.save(file_path_and_name)
+    
+    def automatic_bad_channel_marking(self, threshold_sd_of_mean=40, interpolate=True, **kwargs):
+
+        df = self.get_epochs_df(picks=mne.pick_types(self.raw.info, eeg=True),
+                                **kwargs)
+
+        group = df.groupby(['condition', 'epoch'])
+        mean = group.mean()
+        std = group.std()
+
+        a = mean.std()
+        a = a[1:]
+        print('standard deviation of mean across epochs:')
+        print(np.mean(a), np.std(a))
+        print('higher than %s:' % threshold_sd_of_mean)
+        print(a[a>threshold_sd_of_mean].index)
+
+        for i in a[a > threshold_sd_of_mean].index:
+            self.raw.info['bads'].append(i)
+        print("Marked as bad: ", np.array(self.raw.info['bads']))
+
+        print("N marked as bad: ", len(self.raw.info['bads']))
+
+        if interpolate:
+            "Interpolating bad channels..."
+            if len(self.raw.info['bads']) > 0:
+                self.raw.interpolate_bads(reset_bads=True)
 
 # TODO: Maybe have a function to plot raw data to files.
 # TODO: Method to interpolate bad channels
