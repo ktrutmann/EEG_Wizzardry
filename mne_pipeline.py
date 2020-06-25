@@ -5,7 +5,6 @@ import mne
 import pandas as pd
 import numpy as np
 
-
 class EEGPrep(object):
     """
     Allows to load EEG data from file, perform different preprocessing steps
@@ -285,6 +284,12 @@ class EEGPrep(object):
 
     def get_epochs_df(self, event_labels, **kwargs):
         # TODO (Laura): (For later) Check how this exports "rejected" or "marked as bad" epochs
+        
+        # TODO (Laura): change columns (check whether this collides with automatic_bad_channel_marking)
+        # self.get_epochs_df(event_labels=['start_choice', 'feedback']).set_index(['condition', 'epoch', 'time'])
+        
+        # TODO (Laura): rename condition columns
+        
         """
         Gets epoch data as pandas DataFrames, given a list of event labels.
 
@@ -376,27 +381,48 @@ class EEGPrep(object):
             file_path_and_name = os.path.join(save_path, '{}_epochs.fif'.format(self.participant_id))
             self.epochs.save(file_path_and_name)
     
-    def automatic_bad_channel_marking(self, threshold_sd_of_mean=40, interpolate=True, **kwargs):
+    def deal_with_bad_channels(self, selection_method, plot=True, threshold_sd_of_mean=40, interpolate=True, **kwargs):
+        # TODO (Laura):
+        # add interactive plotting
+        # add manual selection from file
+        # add error if selection_method is not automatic or file or manual
+        
+        """
+        ADD DESCRIPTION
+        """
+        
+        if selection_method == "automatic":
+            df = self.get_epochs_df(picks=mne.pick_types(self.raw.info, eeg=True),
+                                    **kwargs)
 
-        df = self.get_epochs_df(picks=mne.pick_types(self.raw.info, eeg=True),
-                                **kwargs)
+            group = df.groupby(['condition', 'epoch'])
+            mean = group.mean()
+            std = group.std()
 
-        group = df.groupby(['condition', 'epoch'])
-        mean = group.mean()
-        std = group.std()
+            a = mean.std()
+            a = a[1:]
+            print('standard deviation of mean across epochs:')
+            print(np.mean(a), np.std(a))
+            print('higher than %s:' % threshold_sd_of_mean)
+            print(a[a>threshold_sd_of_mean].index)
 
-        a = mean.std()
-        a = a[1:]
-        print('standard deviation of mean across epochs:')
-        print(np.mean(a), np.std(a))
-        print('higher than %s:' % threshold_sd_of_mean)
-        print(a[a>threshold_sd_of_mean].index)
+            for i in a[a > threshold_sd_of_mean].index:
+                self.raw.info['bads'].append(i)
+            
+            print("Marked as bad: ", np.array(self.raw.info['bads']))
 
-        for i in a[a > threshold_sd_of_mean].index:
-            self.raw.info['bads'].append(i)
-        print("Marked as bad: ", np.array(self.raw.info['bads']))
-
-        print("N marked as bad: ", len(self.raw.info['bads']))
+            print("N marked as bad: ", len(self.raw.info['bads']))
+        
+        elif selection_method == "file":
+            pass
+        
+        elif selection_method != "manual":
+            pass
+            # raise ValueError
+            
+        if plot:
+            pass
+            # save the bad channels to file...
 
         if interpolate:
             "Interpolating bad channels..."
@@ -404,12 +430,6 @@ class EEGPrep(object):
                 self.raw.interpolate_bads(reset_bads=True)
 
 # TODO: Maybe have a function to plot raw data to files.
-# TODO: Method to interpolate bad channels
-# TODO: Method to exclude bad epochs
-
-# TODO (Laura): Implement bad_channels methods:
-#   - detect_bad_channels() with your algorithm
-#   - mark_bad_channels() where you plot the data and can click on the bad channels
-#   - interpolate_bad_channels() just a wrapper for the mne method.
 
 # TODO (Peter): Add a "find_bad_epochs" method (manually and/or automatically)
+# TODO: Method to exclude bad epochs
