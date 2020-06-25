@@ -2,7 +2,7 @@ import os
 import warnings
 import pickle
 import mne
-import numpy as np
+import pandas as pd
 
 
 class EEGPrep(object):
@@ -11,7 +11,7 @@ class EEGPrep(object):
     and save the results for further analysis.
     """
 
-    def __init__(self, eeg_path, trigger_dict, participant_identifier=''):
+    def __init__(self, eeg_path, trigger_dict, participant_identifier='xxx'):
         """
         Initiates the EEGPrep object, given a file path and a trigger dictionary,
         containing the number coding of the trigger to events.
@@ -43,6 +43,7 @@ class EEGPrep(object):
         self.epochs = None
         self.epochs_pd_df = None
         self.ica = None
+        self.ica_fit_params = None
 
         # import data
         if eeg_path.endswith('.bdf'):
@@ -50,7 +51,7 @@ class EEGPrep(object):
         elif eeg_path.endswith('.fif'):
             self.raw = mne.io.read_raw_fif(self.eeg_path, preload=True)
 
-    def fix_channels(self, montage_path, n_ext_channels=None, ext_ch_mapping=None):
+    def fix_channels(self, n_ext_channels=None, ext_ch_mapping=None):
         """
         Removes the '1-' from the start of the channel names, sets the Montage (telling MNE which electrode went where)
         and sets the type of the additional electrodes. For the fixing of the channel names it is assumed that the
@@ -58,9 +59,6 @@ class EEGPrep(object):
 
         Parameters
         ----------
-        montage_path : str
-            A valid string path pointing to the montage folder of the MNE module.
-
         n_ext_channels : int
             The number of extra channels used above the 64 standard ones. This includes the reference channels
             but not the Stim (trigger) channel.
@@ -90,8 +88,9 @@ class EEGPrep(object):
         self.raw.drop_channels(self.raw.ch_names[64 + n_ext_channels:len(self.raw.ch_names) - 1])
 
         # Set montage
-        montage = mne.channels.read_montage(kind='biosemi64', path=montage_path)
-        self.raw.set_montage(montage)
+        montage = mne.channels.make_standard_montage(kind='biosemi64')
+        self.raw.set_montage(montage, raise_if_subset=False)
+        # Note: raise_if_subset will be removed in mne V 0.21. Keep an eye out for that.
 
         # Set channel types
         self.raw.set_channel_types(mapping=ext_ch_mapping)
@@ -155,31 +154,27 @@ class EEGPrep(object):
 
         return self.events
 
-    def remove_artifacts_by_ica(self, fit_on_epochs=False, auto_select_eye_artifacts=False, high_pass_freq=1,
-                                decim=3, reject_list_save_location='', **kwargs):
+    def find_ica_components(self, fit_on_epochs=False, high_pass_freq=1, decim=3, n_components=20, **kwargs):
         """
-        Uses independent component analysis to remove movement components (primarily eye artifacts).
+        Uses independent component analysis to find movement components (primarily eye artifacts).
         The fitting procedure can either use the complete raw data or the epoched data to exclude the breaks
-        between trials. The exclusions are then however applied to both the raw data and (if it exists) the epoched
-        data.
+        between trials. If the function is re-run with the same parameters it is not re-fit but the components
+        are plotted again.
 
         Parameters
         ----------
         fit_on_epochs: bool
             Indicates whether the ICA will be fit on the epoched data, thus leaving out the gaps between trials.
             Default behavior is to use all of the raw data.
-        auto_select_eye_artifacts: bool
-            If set to true the method will use mne's `ica.find_bads_eog` to automatically select which components
-            to remove from the data. Defaults to False (manual selection of which components to remove).
         high_pass_freq: float, int
             Before fitting the ICA a high pass filter is applied since the procedure is very sensitive to low
             frequencies. This value indicates the cutoff frequency. Defaults to 1 Hz.
         decim: int
-            Determines by how much the data is decimated when fitting the ICA. This maked the process faster as
+            Determines by how much the data is decimated when fitting the ICA. This makes the process faster as
             only every n-th sample is used. Defaults to 3.
-        reject_list_save_location: str, None
-            Where to save the list of rejected ICA components. Default is the current directory.
-            Set to None if this list should not be saved.
+        n_components: int
+            The number of components that are used while fitting the ICA. Defaults to 20. Set to None if the maximum
+            number (number of channels) should be used.
         kwargs:
             Will be passed on to the mne.preprocessing.ICA (for creating the ICA object).
             For available arguments see https://mne.tools/stable/generated/mne.preprocessing.ICA.html
@@ -189,42 +184,80 @@ class EEGPrep(object):
         The mna ICA method excludes segments that have previously been annotated as "bad" from the fitting procedure,
         so make sure you have excluded segments by hand where the data is completely unusable (e.g. during a sneeze
         or yawning).
-
-        TODO (Meeting): Discuss whether and how to use the "reject" argument of ICA.fit()
-        TODO: Maybe make it possible to use a "reject component list" as input (for reproducability).
-        TODO (Kevin): Test ica
-        TODO (Kevin): Split this into "find_ica_components" and "reject_ICA_components"
+        # TODO (Meeting): Discuss whether to explicedly use the "reject" argument of ICA.fit()
+        # (uses amplitude difference) or leave it in the kwargs?
         """
-
         if fit_on_epochs and self.epochs is None:
             raise AttributeError('No epochs found. You have to create epochs using `get_epochs()` before '
                                  'you can fit the ICA on them.')
 
-        fit_data = self.epochs if fit_on_epochs else self.raw
+        # Checking whether the ICA needs to be re-run:
+        these_params = dict(fit_on_epochs=fit_on_epochs, high_pass_freq=high_pass_freq, decim=decim)
+        these_params.update(kwargs)
+        if self.ica is None or these_params != self.ica_fit_params:
 
-        self.ica = mne.preprocessing.ICA(**kwargs)
-        self.ica.fit(fit_data.filter(high_pass_freq, None), decim=decim)
+            fit_data = self.epochs if fit_on_epochs else self.raw
 
-        # Rejecting bad components:
-        if auto_select_eye_artifacts:
+            self.ica = mne.preprocessing.ICA(n_components=n_components, **kwargs)
+            self.ica.fit(fit_data.filter(high_pass_freq, None), decim=decim)
+            self.ica_fit_params = dict(fit_on_epochs=fit_on_epochs, high_pass_freq=high_pass_freq, decim=decim)
+            self.ica_fit_params.update(kwargs)
+
+        print('Plotting found components. If you plan to exclude components manually make sure to create a file '
+              'listing the numbers of those you wish to exclude.')
+        self.ica.plot_components()
+
+    def remove_ica_components(self, reject_from_file=True, reject_list_file_location='', **kwargs):
+        """
+        If an ICA object has previously been generated this method provides the possibility of either automatically
+        or manually rejecting and removing individual components from the signal.
+
+        Parameters
+        ----------
+        reject_from_file: bool
+            Indicates whether the components to be rejected should be taken from a list in a file whose location is
+            provided by the `reject_lift_file_location` argument. If set to `False`, mne's `find_bads_eog()` method
+            will be evoked.
+        reject_list_file_location: str, None
+            Where to save the list of rejected ICA components. Default is the current directory.
+            Set to None if this list should not be saved.
+        kwargs:
+            Will be passed on to ica.apply() for both the raw data and epoched data.
+
+        Notes
+        -----
+        The mna ICA method excludes segments that have previously been annotated as "bad" from the fitting procedure,
+        so make sure you have excluded segments by hand where the data is completely unusable (e.g. during a sneeze
+        or yawning).
+        """
+        exclude_list_file = os.path.join(reject_list_file_location,
+                                         'participant_{}_rejected_ICA_components.csv'.format(self.participant_id))
+
+        if reject_from_file:
+            self.ica.exclude = pd.read_csv(exclude_list_file, header=None).iloc[:, 0].to_list()
+        else:
+            fit_data = self.epochs if self.ica_fit_params['fit_on_epochs'] else self.raw
             eog_indices, eog_scores = self.ica.find_bads_eog(fit_data)
             self.ica.exclude = eog_indices
-            print('Automatically excluding the following components: {}'.format(eog_indices))
-            # TODO (Kevin): Maybe still plot the components?
-        else:
-            self.ica.exclude = []  # TODO (Kevin): Implement manual component removal
-            # TODO (Kevin): Get the user to create a list file.
+            pd.Series(self.ica.exclude).to_csv(exclude_list_file, header=False, index=False)
 
-        if reject_list_save_location is not None:
-            np.savetxt(os.path.join(reject_list_save_location,
-                                    'participant_{}_rejected_ICA_components.csv'.format(self.participant_id)),
-                       self.ica.exclude, fmt='%i')
+            if len(self.ica.exclude) == 0:
+                print('No bad components detected. Excluding 0 components.')
+                return
+
+            print('Plotting components that will be excluded.')
+            self.ica.plot_scores(eog_scores)
+            print('The excluded component indices have been saved to {}.'.format(exclude_list_file))
 
         # Applying the ica
-        if len(self.ica.exclude) > 0:
-            self.ica.apply(self.raw, exclude=self.ica.exclude)
-            if self.epochs is not None:
-                self.ica.apply(self.epochs, exclude=self.ica.exclude)
+        print('Applying ICA to the raw data excluding the following components: {}'.format(
+            self.ica.exclude))
+        self.ica.apply(self.raw, exclude=self.ica.exclude, **kwargs)
+
+        if self.epochs is not None:
+            print('Applying ICA to the epoched data excluding the following components: {}'.format(
+                self.ica.exclude))
+            self.ica.apply(self.epochs, exclude=self.ica.exclude, **kwargs)
 
     def get_epochs(self, epoch_event_dict, **kwargs):
         # TODO (Laura): Add event list support here as well
@@ -294,9 +327,7 @@ class EEGPrep(object):
         self.raw.notch_filter(range(notch_freq, high_freq, notch_freq), filter_length='auto',
                               phase='zero', fir_design='firwin')
 
-    def save_prepared_data(self, save_path='', file_name='EEG_data', save_events=False, save_epochs=False, **kwargs):
-        # TODO (Kevin): Test
-        # TODO (Kevin): Include participant id in names
+    def save_prepared_data(self, save_path='', save_events=False, save_epochs=False, **kwargs):
         """
         This method saves the prepared raw data and (optionally) the epochs.
         It can also save the events as a pickle file so it can easily be reused later.
@@ -306,9 +337,6 @@ class EEGPrep(object):
         save_path: string, optional
             A path to the folder where the data should be saved in. If not provided, the file will be saved in the
             directory the script is run from.
-
-        file_name: string, optional
-            A string providing the name of the file. '_prep_raw.fif', '_epochs.fif' ect. will automatically be added.
 
         save_events: boolean, optional
             Indicates whether the found events should be saved as pickle files as well.
@@ -320,7 +348,7 @@ class EEGPrep(object):
             Will be passed on to the raw.save() method.
         """
 
-        file_path_and_name = os.path.join(save_path, file_name.__add__('_prepared_raw.fif'))
+        file_path_and_name = os.path.join(save_path, '{}_prepared_raw.fif'.format(self.participant_id))
         self.raw.save(file_path_and_name, **kwargs)
         print('Saved the prepared raw file to {}.'.format(file_path_and_name))
 
@@ -328,7 +356,7 @@ class EEGPrep(object):
             if self.events is None:
                 raise AttributeError('No events to save. Please find them by running the find_events() method first.')
 
-            file_path_and_name = os.path.join(save_path, file_name.__add__('_events.pickle'))
+            file_path_and_name = os.path.join(save_path, '{}_events.pickle'.format(self.participant_id))
             pickle_file = open(file_path_and_name, 'wb')
             pickle.dump(self.events, pickle_file)
             pickle_file.close()
@@ -339,16 +367,12 @@ class EEGPrep(object):
                 raise AttributeError('You have not created any epochs yet.\n'
                                      'Create them by running the make_epochs() method first.')
 
-            file_path_and_name = os.path.join(save_path, file_name.__add__('epochs.fif'))
+            file_path_and_name = os.path.join(save_path, '{}_epochs.fif'.format(self.participant_id))
             self.epochs.save(file_path_and_name)
 
 # TODO: Maybe have a function to plot raw data to files.
 # TODO: Method to interpolate bad channels
 # TODO: Method to exclude bad epochs
-
-# TODO (Kevin): Start implementing ICA
-#   - Give option to let ica.find_bads_eog() do the work and/or manually exclude components
-#   - Find a way to only fit ICA on "trial data" (exclude pauses; Make this an option?)
 
 # TODO (Laura): Implement bad_channels methods:
 #   - detect_bad_channels() with your algorithm

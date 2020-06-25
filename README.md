@@ -9,6 +9,6 @@ Please add your files with the name format *\<YOUR NAME\>_\<WHAT IT IS\>*. This 
 - [X] Find events
 - [x] Filter
 - [ ] Find/interpolate bad channels
-- [ ] ICA
+- [X] ICA
 - [ ] Exclude bad epochs
 - [X] Export / Save
