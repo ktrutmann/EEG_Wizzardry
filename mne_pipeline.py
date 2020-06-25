@@ -389,6 +389,7 @@ class EEGPrep(object):
         
         """
         ADD DESCRIPTION
+        Also explain what this is doing.
         """
         
         if selection_method == "automatic":
@@ -397,7 +398,6 @@ class EEGPrep(object):
 
             group = df.groupby(['condition', 'epoch'])
             mean = group.mean()
-            std = group.std()
 
             a = mean.std()
             a = a[1:]
