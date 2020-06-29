@@ -40,7 +40,8 @@ def test_pipeline_laura_dat():
                      feedback_null=32,
                      end_trial=64)
     
-    data_preprocessed = mne_pipeline.EEGPrep(eeg_path = 'Data/raw/laura_raw.fif', trigger_dict = events_id)
+    data_preprocessed = mne_pipeline.EEGPrep(eeg_path = 'Data/raw/laura_raw.fif', trigger_dict = events_id, participant_identifier=1)
+    assert isinstance(data_preprocessed.raw, mne.io.fiff.raw.Raw)
     
     data_preprocessed.fix_channels(
         ext_ch_mapping = {'FT10': 'eog', 
@@ -54,15 +55,19 @@ def test_pipeline_laura_dat():
         n_ext_channels = 9)
     
     data_preprocessed.set_references(ref_ch = ['FT9', 'PO9'], 
-                                 bipolar_dict = dict(
-                                     eye_horizontal=['PO10', 'FT10'],
-                                     eye_vertical=['HeRe', 'FT10'],
-                                     right_hand=['HeLi', 'VeDo'],
-                                     left_hand=['VeUp', 'EMG1a']))
+                                     bipolar_dict = dict(
+                                         eye_horizontal=['PO10', 'FT10'],
+                                         eye_vertical=['HeRe', 'FT10'],
+                                         right_hand=['HeLi', 'VeDo'],
+                                         left_hand=['VeUp', 'EMG1a']))
     
     data_preprocessed.filters(low_freq=.1, high_freq=100, notch_freq=50)
     
     data_preprocessed.find_events(stim_channel='Status')
+    assert eeg_prep.events is not None
+    
+    epochs_df = data_preprocessed.get_epochs_df(event_labels=['start_choice', 'feedback'])
+    print(epochs_df.head())
     
     data_preprocessed.automatic_bad_channel_marking(interpolate=True,
                                                     threshold_sd_of_mean=40,

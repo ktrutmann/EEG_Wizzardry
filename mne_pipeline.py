@@ -317,7 +317,8 @@ class EEGPrep(object):
                             **kwargs)
 
         df = epochs.to_data_frame()
-        df.reset_index(inplace=True)
+        df['participant'] = self.participant_id
+        df = df.reset_index().set_index(['participant', 'condition', 'epoch', 'time'])
 
         return df
 
