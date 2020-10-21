@@ -5,6 +5,7 @@ import mne
 import pandas as pd
 import numpy as np
 
+
 class EEGPrep(object):
     """
     Allows to load EEG data from file, perform different preprocessing steps
@@ -34,7 +35,6 @@ class EEGPrep(object):
         raw : instance of RawEDF
             mne class for raw data.
             See: https://mne.tools/stable/generated/mne.io.Raw.html#mne.io.Raw
-        TODO (Meeting): Call it "participant" or "subject" or something else?
         """
         self.eeg_path = eeg_path
         self.trigger_dict = trigger_dict
@@ -90,7 +90,7 @@ class EEGPrep(object):
         # Set montage
         montage = mne.channels.make_standard_montage(kind='biosemi64')
         self.raw.set_montage(montage, raise_if_subset=False)
-        # Note: raise_if_subset will be removed in mne V 0.21. Keep an eye out for that.
+        # TODO: This raises a deprecation warning. How else can we set the montage?
 
         # Set channel types
         self.raw.set_channel_types(mapping=ext_ch_mapping)
@@ -99,7 +99,7 @@ class EEGPrep(object):
 
     def set_references(self, ref_ch=None, bipolar_dict=None):
         """
-        This method re-references the prepared raw eeg data to the average signal at the Mastoid bones.
+        This method re-references the prepared raw eeg data to the average signal at the mastoid bones.
         Further, it sets bipolar references for eog and emg data and creates a new channel for the referenced signal.
 
         Parameters
@@ -184,8 +184,6 @@ class EEGPrep(object):
         The mna ICA method excludes segments that have previously been annotated as "bad" from the fitting procedure,
         so make sure you have excluded segments by hand where the data is completely unusable (e.g. during a sneeze
         or yawning).
-        # TODO (Meeting): Discuss whether to explicedly use the "reject" argument of ICA.fit()
-        # (uses amplitude difference) or leave it in the kwargs?
         """
         if fit_on_epochs and self.epochs is None:
             raise AttributeError('No epochs found. You have to create epochs using `get_epochs()` before '
@@ -220,6 +218,7 @@ class EEGPrep(object):
             will be evoked.
         reject_list_file_location: str, None
             Where to save the list of rejected ICA components. Default is the current directory.
+            If the directory does not exist it will be created.
             Set to None if this list should not be saved.
         kwargs:
             Will be passed on to ica.apply() for both the raw data and epoched data.
@@ -230,6 +229,9 @@ class EEGPrep(object):
         so make sure you have excluded segments by hand where the data is completely unusable (e.g. during a sneeze
         or yawning).
         """
+        if not os.path.exists(reject_list_file_location):
+            os.makedirs(reject_list_file_location)
+
         exclude_list_file = os.path.join(reject_list_file_location,
                                          'participant_{}_rejected_ICA_components.csv'.format(self.participant_id))
 
@@ -276,6 +278,11 @@ class EEGPrep(object):
         if self.events is None:
             raise AttributeError('No events found. Please find them by running the find_events() method first.')
 
+        for event in event_labels:
+            if event not in self.trigger_dict.keys():
+                raise ValueError('{} in event_labels is not one of the your event names. Those are {}'.format(
+                    event, self.trigger_dict.keys()))
+
         self.epochs = mne.Epochs(self.raw, 
                                  events=self.events, 
                                  event_id=[self.trigger_dict[event] for event in event_labels], 
@@ -311,6 +318,11 @@ class EEGPrep(object):
         if self.events is None:
             raise AttributeError('No events found. Please find them by running the find_events() method first.')
 
+        for event in event_labels:
+            if event not in self.trigger_dict.keys():
+                raise ValueError('{} in event_labels is not one of the your event names. Those are {}'.format(
+                    event, self.trigger_dict.keys()))
+
         epochs = mne.Epochs(self.raw,
                             events=self.events,
                             event_id=[self.trigger_dict[event] for event in event_labels],
@@ -333,7 +345,8 @@ class EEGPrep(object):
         high_freq: float, optional
             frequency for low pass filter
         notch_freq: float, optional
-            frequency for notch filter
+            frequency for notch filter.
+            The base frequency as well as all its harmonies up to `high_freq` are filtered.
         """
         self.raw.filter(l_freq= low_freq, h_freq= high_freq)
         self.raw.notch_filter(range(notch_freq, high_freq, notch_freq), filter_length='auto',
