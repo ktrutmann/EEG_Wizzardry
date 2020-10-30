@@ -20,7 +20,7 @@ def test_pipeline_kev_data():
                                               right_hand=['HeLi', 'VeDo'],
                                               left_hand=['VeUp', 'EMG1a']))
 
-    eeg_prep.find_events(stim_channel='Status', uint_cast=True, consecutive=True, min_duration=.01)
+    eeg_prep.find_events(stim_channel='Status', consecutive=True, min_duration=.01)
     assert eeg_prep.events is not None
 
     eeg_prep.find_ica_components()
@@ -28,20 +28,21 @@ def test_pipeline_kev_data():
     assert eeg_prep.ica is not None
     assert len(eeg_prep.ica.exclude) > 0
 
-    events_to_be_used = ['Left_choice', 'Right_choice']
+    eeg_prep.filters(low_freq=1/7, high_freq=128, notch_freq=50)
 
-    eeg_prep.get_epochs(event_labels=events_to_be_used)
-    data_frame = eeg_prep.get_epochs_df(event_labels=events_to_be_used)
+    events_to_be_used = ['Left_choice', 'Right_choice']
+    eeg_prep.get_epochs(event_labels=events_to_be_used, tmin=-1.5, tmax=.2, baseline=(-1.5, -1.2))
+    data_frame = eeg_prep.get_epochs_df(event_labels=events_to_be_used, tmin=-1.5, tmax=.2, baseline=(-1.5, -1.2))
     assert isinstance(data_frame, pd.DataFrame)
 
     # Assert that they have the same number of chanels and number of events
     assert eeg_prep.epochs.info['nchan'] + 1 == data_frame.shape[1]
     assert eeg_prep.epochs.events.shape[0] == len(data_frame.index.levels[2])
 
-    eeg_prep.filters(low_freq=1/7, high_freq=128, notch_freq=50)
 
     # TODO: Test the other methods as soon as they are implemented
 
+    # TODO (Kevin): Test saving epochs and whether **kwargs should also be passed on to that
     # Saving data:
     eeg_prep.save_prepared_data(save_path=os.path.join('Data', 'prepared'),
                                 overwrite=True)

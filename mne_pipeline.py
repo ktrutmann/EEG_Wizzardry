@@ -262,6 +262,7 @@ class EEGPrep(object):
             self.ica.apply(self.epochs, exclude=self.ica.exclude, **kwargs)
 
     def get_epochs(self, event_labels, **kwargs):
+        # TODO (Discuss): Why not add a `as_df` argument here and merge with `get_epochs_df`?
         """
         This method creates the epochs from the events found previously by calling the `make_events` method.
 
@@ -348,7 +349,7 @@ class EEGPrep(object):
             frequency for notch filter.
             The base frequency as well as all its harmonies up to `high_freq` are filtered.
         """
-        self.raw.filter(l_freq= low_freq, h_freq= high_freq)
+        self.raw.filter(l_freq=low_freq, h_freq=high_freq)
         self.raw.notch_filter(range(notch_freq, high_freq, notch_freq), filter_length='auto',
                               phase='zero', fir_design='firwin')
 
