@@ -88,8 +88,10 @@ class EEGPrep(object):
         self.raw.drop_channels(self.raw.ch_names[64 + n_ext_channels:len(self.raw.ch_names) - 1])
 
         # Set montage
-        montage = mne.channels.make_standard_montage(kind='biosemi64')
-        self.raw.set_montage(montage, raise_if_subset=False)
+        #montage = mne.channels.make_standard_montage(kind='biosemi64')
+        montage_path = '/usr/local/lib/python3.7/site-packages/mne/channels/data/montages'
+        montage = mne.channels.read_montage(kind='biosemi64', path=montage_path)
+        self.raw.set_montage(montage)
         # TODO: This raises a deprecation warning. How else can we set the montage?
 
         # Set channel types
@@ -290,6 +292,7 @@ class EEGPrep(object):
                                  **kwargs)
         print('Created epochs using the provided event ids and / or labels.')
 
+
     def get_epochs_df(self, event_labels, **kwargs):
         # TODO (Laura): (For later) Check how this exports "rejected" or "marked as bad" epochs
         
@@ -447,4 +450,37 @@ class EEGPrep(object):
 # TODO: Maybe have a function to plot raw data to files.
 
 # TODO (Peter): Add a "find_bad_epochs" method (manually and/or automatically)
-# TODO: Method to exclude bad epochs
+
+    def find_bad_epochs(self, selection_method='automatic',scale_params = 'default'):
+        """
+        This method identifies epochs that will be rejected for further analysis
+
+        Parameters
+        ----------
+        selection_method: string, optional
+            use automatic or manual epoch detection
+        scale_params = dict, optional
+            parameters to depict epochs in a visually accessible way
+        """
+        if scale_params == 'default':
+            scale_params = dict(mag=1e-12, grad=4e-11, eeg=150e-6, eog=25e-5, ecg=5e-4,
+                               emg=1e-3, ref_meg=1e-12, misc=1e-3, stim=1, resp=1, chpi=1e-4,
+                               whitened=10.)
+
+        derp = self.epochs.copy()
+        if selection_method == 'automatic':
+            derp.drop_bad()
+        elif selection_method == 'manual':
+            derp.plot(n_channels = 68, scalings=scale_params, block=True)
+
+        epoch_idx = 0
+        epochs_tobedropped = []
+        for i in range(len(self.epochs.drop_log)):
+            if (self.epochs.drop_log[i]== []): # select epochs of interest
+                if (self.epochs.drop_log[i] != derp.drop_log[i]): # find index of epochs to be dropped
+                    epochs_tobedropped.append(epoch_idx)
+                epoch_idx += 1
+        print(epochs_tobedropped)
+        # TODO Peter: save epochs to be dropped in a document
+        # TODO Peter: Documentation of find_bad_epochs
+
