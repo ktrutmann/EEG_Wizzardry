@@ -402,7 +402,8 @@ class EEGPrep(object):
     def deal_with_bad_channels(self, selection_method, plot=True, threshold_sd_of_mean=40, interpolate=True, file_path=None, **kwargs):
         # TODO (Laura):
         # add description
-        # check interactive plotting?
+        # add self.participant_id
+        # check that bads is still a list
 
         """
         ADD DESCRIPTION
@@ -440,16 +441,16 @@ class EEGPrep(object):
 
         elif selection_method == "file":
             bads = pd.read_csv(file_path)
-            self.raw.info['bads'] = bads['bad_channels'].values
+            self.raw.info['bads'] = list(bads['bad_channels'].values)
 
             print("Marked as bad: ", np.array(self.raw.info['bads']))
 
             print("N marked as bad: ", len(self.raw.info['bads']))
 
         elif selection_method != "manual":
-            ValueError("selection_method can be automatic, file, or manual")
+            raise ValueError("selection_method can be automatic, file, or manual")
 
-        if plot:
+        if plot or selection_method=='manual':
             self.raw.plot() # allow interactive marking of bad channels??
 
             print("Marked as bad: ", np.array(self.raw.info['bads']))
