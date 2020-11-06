@@ -4,12 +4,6 @@
 __pycache__/
 dist/
 build/
-
-# pystan cashed models
-cached*.pkl
-*.pkl
-
-# sphinx
-docs/_build
-docs/make.bat
-docs/Makefile
+/testing/
+/.idea/
+*.csv
