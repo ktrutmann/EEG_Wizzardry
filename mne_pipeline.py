@@ -51,8 +51,7 @@ class EEGPrep(object):
         elif eeg_path.endswith('.fif'):
             self.raw = mne.io.read_raw_fif(self.eeg_path, preload=True)
 
-    def fix_channels(self, n_ext_channels=None, ext_ch_mapping=None):
-        # TODO: (Peter) Create "use_this_montage" argument -> If it does not provide a path use .make_standard_montage()
+    def fix_channels(self, n_ext_channels=None, ext_ch_mapping=None, montage_path=None):
         """
         Removes the '1-' from the start of the channel names, sets the Montage (telling MNE which electrode went where)
         and sets the type of the additional electrodes. For the fixing of the channel names it is assumed that the
@@ -71,6 +70,9 @@ class EEGPrep(object):
             `n_ext_channels` is overwritten to 9. The default dictionary is as follows:
             `{'FT10': 'eog', 'PO10': 'eog', 'HeRe': 'eog', 'HeLi': 'emg', 'VeUp': 'emg', 'VeDo': 'emg',
              'EMG1a': 'emg', 'Status': 'resp'}`
+
+        montage_path : str, optional
+            If "None", a standard montage (biosemi64) is used. Alternatively, a customized montage is loaded and applied.
         """
 
         if ext_ch_mapping is None:
@@ -89,11 +91,21 @@ class EEGPrep(object):
         self.raw.drop_channels(self.raw.ch_names[64 + n_ext_channels:len(self.raw.ch_names) - 1])
 
         # Set montage
-        montage = mne.channels.make_standard_montage(kind='biosemi64')
-        # montage_path = '/usr/local/lib/python3.7/site-packages/mne/channels/data/montages'
-        # montage = mne.channels.read_montage(kind='biosemi64', path=montage_path)
+        if montage_path == None:
+            try:
+                montage = mne.channels.read_montage(kind='biosemi64')
+            except:
+                montage = mne.channels.make_standard_montage(kind='biosemi64')
+        else:
+            try:
+                montage = mne.channels.read_montage(kind='biosemi64', path=montage_path)
+            except:
+                mne.channels.read_custom_montage(fname=montage_path)
+        # TODO: needs to be tested for mne versions > 0.17
+
         self.raw.set_montage(montage)
         # TODO: This raises a deprecation warning. How else can we set the montage?
+
 
         # Set channel types
         self.raw.set_channel_types(mapping=ext_ch_mapping)
@@ -467,30 +479,36 @@ class EEGPrep(object):
 
 # TODO: Maybe have a function to plot raw data to files.
 
-    def find_bad_epochs(self, selection_method='automatic', scale_params='default', drop_epochs=False):
+    def deal_with_bad_epochs(self, selection_method='automatic', scale_params='default', drop_epochs=False, file_name=None):
         """
         This method identifies epochs that will be rejected for further analysis
 
         Parameters
         ----------
         selection_method: string, optional
-            use automatic or manual epoch detection
+            use automatic or manual epoch detection. When using file, epochs get selected from a specified file.
         scale_params = dict, optional
             parameters to depict epochs in a visually accessible way
+        drop_epochs: bool, optional
+            directly remove epochs from EEG data
+        file_name: string, optional
+            allows to specify the file name of the output file. Also used if selection_method == file.
         """
         if scale_params == 'default':
             scale_params = dict(mag=1e-12, grad=4e-11, eeg=150e-6, eog=25e-5, ecg=5e-4,
                                 emg=1e-3, ref_meg=1e-12, misc=1e-3, stim=1, resp=1, chpi=1e-4,
                                 whitened=10.)
+        if file_name is None:
+            file_name = os.path.join(os.getcwd(), 'participant_%s_bad_epochs.csv'%self.participant_id)
 
         epochs_copy = self.epochs.copy()
         if selection_method == 'automatic':
             epochs_copy.drop_bad()
         elif selection_method == 'manual':
-            epochs_copy.plot(n_channels=68, scalings=scale_params, block=True)
+            epochs_copy.plot(n_channels=68, scalings=scale_params,block=True)
         elif selection_method == 'file':
-            # TODO (Peter): implement argument selection_method='file' which reads the bad epochs from the file
-            pass
+            epochs_to_be_dropped = pd.read_csv(file_name).epochs.to_list()
+            epochs_copy.drop(epochs_to_be_dropped)
         else:
             raise ValueError('Invalid selection method. Permitted methods are automatic, manual and file.')
 
@@ -501,11 +519,11 @@ class EEGPrep(object):
                 if self.epochs.drop_log[i] != epochs_copy.drop_log[i]:  # find index of epochs to be dropped
                     epochs_to_be_dropped.append(epoch_idx)
                 epoch_idx += 1
-        print(epochs_to_be_dropped)
-        # TODO (Peter): save epochs to be dropped in a document with the participant_id
+        pd.DataFrame(epochs_to_be_dropped,columns=['epochs']).to_csv(file_name)
+        print('Saved to-be-dropped epochs to {}.'.format(file_name))
 
         if drop_epochs:
-            # TODO (Peter): implement argument drop=False which actually drops the epochs if set to true
-            pass
+            epochs_dropped = pd.read_csv(file_name).epochs.to_list()
+            self.epochs.drop(epochs_dropped)
 
         del epochs_copy

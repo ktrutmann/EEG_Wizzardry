@@ -108,7 +108,8 @@ def test_pipeline_peter_dat():
                                           'HeLi': 'eog',
                                           'VeUp': 'eog',
                                           'VeDo': 'eog',
-                                          'STI 014': 'resp'})
+                                          'STI 014': 'resp'},
+                          montage_path = '/usr/local/lib/python3.7/site-packages/mne/channels/data/montages')
 
     eeg_prep.set_references(ref_ch=['PO9','FT9'],bipolar_dict=dict(
                                               eye_horizontal=['HeRe', 'HeLi'],
@@ -119,14 +120,10 @@ def test_pipeline_peter_dat():
     eeg_prep.find_events(stim_channel='STI 014', consecutive=True, min_duration=.01)
     assert eeg_prep.events is not None
 
-    print(eeg_prep.raw.ch_names)
 
     eeg_prep.get_epochs(event_labels=['Stimulus'], tmin=-.5, tmax=2, baseline=(-.5,0))
-    eeg_prep.find_bad_epochs(selection_method='automatic')
-
-
+    eeg_prep.deal_with_bad_epochs(selection_method='file',drop_epochs=True,file_name='/Users/peterkraemer/PycharmProjects/EEG_Wizzardry/Data/prepared/test1')
 
     # Saving data:
     eeg_prep.save_prepared_data(save_path=os.path.join('Data', 'prepared'),
                                 overwrite=True)
-test_pipeline_peter_dat()
