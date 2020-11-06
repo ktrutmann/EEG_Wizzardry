@@ -396,12 +396,11 @@ class EEGPrep(object):
             file_path_and_name = os.path.join(save_path, '{}_epochs.fif'.format(self.participant_id))
             self.epochs.save(file_path_and_name)
     
-    def deal_with_bad_channels(self, selection_method, plot=True, threshold_sd_of_mean=40, interpolate=True, **kwargs):
+    def deal_with_bad_channels(self, selection_method, plot=True, threshold_sd_of_mean=40, interpolate=True, file_path=None, **kwargs):
         # TODO (Laura):
-        # add interactive plotting
-        # add manual selection from file
-        # add error if selection_method is not automatic or file or manual
-        
+        # add description
+        # check interactive plotting?
+
         """
         ADD DESCRIPTION
         Also explain what this is doing.
@@ -423,21 +422,44 @@ class EEGPrep(object):
 
             for i in a[a > threshold_sd_of_mean].index:
                 self.raw.info['bads'].append(i)
-            
+
             print("Marked as bad: ", np.array(self.raw.info['bads']))
 
             print("N marked as bad: ", len(self.raw.info['bads']))
-        
+
+            if file_path is None:
+                import os
+                file_path = os.getcwd()
+            file_name = os.path.join(file_path, 'bad_channels.csv')
+            pd.DataFrame(self.raw.info['bads'], columns=['bad_channels']).to_csv(path_or_buf=file_name)
+
+            print("Saving bad channels as {}".format(file_name))
+
         elif selection_method == "file":
-            pass
-        
+            bads = pd.read_csv(file_path)
+            self.raw.info['bads'] = bads['bad_channels'].values
+
+            print("Marked as bad: ", np.array(self.raw.info['bads']))
+
+            print("N marked as bad: ", len(self.raw.info['bads']))
+
         elif selection_method != "manual":
-            pass
-            # raise ValueError
-            
+            ValueError("selection_method can be automatic, file, or manual")
+
         if plot:
-            pass
-            # save the bad channels to file...
+            self.raw.plot() # allow interactive marking of bad channels??
+
+            print("Marked as bad: ", np.array(self.raw.info['bads']))
+
+            print("N marked as bad: ", len(self.raw.info['bads']))
+
+            if file_path is None:
+                import os
+                file_path = os.getcwd()
+            file_name = os.path.join(file_path, 'bad_channels.csv')
+            pd.DataFrame(self.raw.info['bads'], columns=['bad_channels']).to_csv(path_or_buf=file_name)
+
+            print("Saving bad channels as {}".format(file_name))
 
         if interpolate:
             "Interpolating bad channels..."
