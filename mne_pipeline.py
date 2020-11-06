@@ -52,6 +52,7 @@ class EEGPrep(object):
             self.raw = mne.io.read_raw_fif(self.eeg_path, preload=True)
 
     def fix_channels(self, n_ext_channels=None, ext_ch_mapping=None):
+        # TODO: (Peter) Create "use_this_montage" argument -> If it does not provide a path use .make_standard_montage()
         """
         Removes the '1-' from the start of the channel names, sets the Montage (telling MNE which electrode went where)
         and sets the type of the additional electrodes. For the fixing of the channel names it is assumed that the
@@ -88,9 +89,9 @@ class EEGPrep(object):
         self.raw.drop_channels(self.raw.ch_names[64 + n_ext_channels:len(self.raw.ch_names) - 1])
 
         # Set montage
-        #montage = mne.channels.make_standard_montage(kind='biosemi64')
-        montage_path = '/usr/local/lib/python3.7/site-packages/mne/channels/data/montages'
-        montage = mne.channels.read_montage(kind='biosemi64', path=montage_path)
+        montage = mne.channels.make_standard_montage(kind='biosemi64')
+        # montage_path = '/usr/local/lib/python3.7/site-packages/mne/channels/data/montages'
+        # montage = mne.channels.read_montage(kind='biosemi64', path=montage_path)
         self.raw.set_montage(montage)
         # TODO: This raises a deprecation warning. How else can we set the montage?
 
@@ -292,13 +293,7 @@ class EEGPrep(object):
                                  **kwargs)
         print('Created epochs using the provided event ids and / or labels.')
 
-
     def get_epochs_df(self, event_labels, **kwargs):
-        # TODO (Laura): (For later) Check how this exports "rejected" or "marked as bad" epochs
-        
-        # TODO (Laura): change columns (check whether this collides with automatic_bad_channel_marking)
-        # self.get_epochs_df(event_labels=['start_choice', 'feedback']).set_index(['condition', 'epoch', 'time'])
-        
         # TODO (Laura): rename condition columns
         
         """
@@ -399,11 +394,11 @@ class EEGPrep(object):
             file_path_and_name = os.path.join(save_path, '{}_epochs.fif'.format(self.participant_id))
             self.epochs.save(file_path_and_name)
     
-    def deal_with_bad_channels(self, selection_method, plot=True, threshold_sd_of_mean=40, interpolate=True, file_path=None, **kwargs):
-        # TODO (Laura):
-        # add description
-        # add self.participant_id
-        # check that bads is still a list
+    def deal_with_bad_channels(self, selection_method, plot=True, threshold_sd_of_mean=40, interpolate=True,
+                               file_path=None, **kwargs):
+        # TODO (Laura): add description here
+        # TODO (Laura): Add slf.participant_id to file name
+        # TODO (Laura): check that bads is still a list
 
         """
         ADD DESCRIPTION
@@ -441,16 +436,16 @@ class EEGPrep(object):
 
         elif selection_method == "file":
             bads = pd.read_csv(file_path)
-            self.raw.info['bads'] = list(bads['bad_channels'].values)
+            self.raw.info['bads'] = bads['bad_channels'].values
 
             print("Marked as bad: ", np.array(self.raw.info['bads']))
 
             print("N marked as bad: ", len(self.raw.info['bads']))
 
         elif selection_method != "manual":
-            raise ValueError("selection_method can be automatic, file, or manual")
+            ValueError("selection_method can be automatic, file, or manual")
 
-        if plot or selection_method=='manual':
+        if plot:
             self.raw.plot() # allow interactive marking of bad channels??
 
             print("Marked as bad: ", np.array(self.raw.info['bads']))
@@ -472,9 +467,7 @@ class EEGPrep(object):
 
 # TODO: Maybe have a function to plot raw data to files.
 
-# TODO (Peter): Add a "find_bad_epochs" method (manually and/or automatically)
-
-    def find_bad_epochs(self, selection_method='automatic',scale_params = 'default'):
+    def find_bad_epochs(self, selection_method='automatic', scale_params='default', drop_epochs=False):
         """
         This method identifies epochs that will be rejected for further analysis
 
@@ -487,23 +480,32 @@ class EEGPrep(object):
         """
         if scale_params == 'default':
             scale_params = dict(mag=1e-12, grad=4e-11, eeg=150e-6, eog=25e-5, ecg=5e-4,
-                               emg=1e-3, ref_meg=1e-12, misc=1e-3, stim=1, resp=1, chpi=1e-4,
-                               whitened=10.)
+                                emg=1e-3, ref_meg=1e-12, misc=1e-3, stim=1, resp=1, chpi=1e-4,
+                                whitened=10.)
 
-        derp = self.epochs.copy()
+        epochs_copy = self.epochs.copy()
         if selection_method == 'automatic':
-            derp.drop_bad()
+            epochs_copy.drop_bad()
         elif selection_method == 'manual':
-            derp.plot(n_channels = 68, scalings=scale_params, block=True)
+            epochs_copy.plot(n_channels=68, scalings=scale_params, block=True)
+        elif selection_method == 'file':
+            # TODO (Peter): implement argument selection_method='file' which reads the bad epochs from the file
+            pass
+        else:
+            raise ValueError('Invalid selection method. Permitted methods are automatic, manual and file.')
 
         epoch_idx = 0
-        epochs_tobedropped = []
+        epochs_to_be_dropped = []
         for i in range(len(self.epochs.drop_log)):
-            if (self.epochs.drop_log[i]== []): # select epochs of interest
-                if (self.epochs.drop_log[i] != derp.drop_log[i]): # find index of epochs to be dropped
-                    epochs_tobedropped.append(epoch_idx)
+            if not self.epochs.drop_log[i]:  # select epochs of interest
+                if self.epochs.drop_log[i] != epochs_copy.drop_log[i]:  # find index of epochs to be dropped
+                    epochs_to_be_dropped.append(epoch_idx)
                 epoch_idx += 1
-        print(epochs_tobedropped)
-        # TODO Peter: save epochs to be dropped in a document
-        # TODO Peter: Documentation of find_bad_epochs
+        print(epochs_to_be_dropped)
+        # TODO (Peter): save epochs to be dropped in a document with the participant_id
 
+        if drop_epochs:
+            # TODO (Peter): implement argument drop=False which actually drops the epochs if set to true
+            pass
+
+        del epochs_copy

@@ -4,7 +4,7 @@ import os
 import pandas as pd
 
 
-def test_pipeline_kev_data():
+def test_pipeline_kev_dat():
     trigger_dict = {'Masked': 2, 'Reveal': 4, 'Left_choice': 8, 'Right_choice': 16, 'No_choice': 32}
 
     # Reading in the data:
@@ -129,5 +129,4 @@ def test_pipeline_peter_dat():
     # Saving data:
     eeg_prep.save_prepared_data(save_path=os.path.join('Data', 'prepared'),
                                 overwrite=True)
-    pass  # TODO (peter): Implement test
 test_pipeline_peter_dat()
