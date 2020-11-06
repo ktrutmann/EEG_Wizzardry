@@ -95,4 +95,39 @@ def test_pipeline_laura_dat():
     
     
 def test_pipeline_peter_dat():
-    pass  # TODO (peter): Implement tests
+    trigger_dict = {'Stimulus': 36, 'Left_choice': 62, 'Right_choice': 64}
+    # Reading in the data:
+    eeg_prep = mne_pipeline.EEGPrep(os.path.join('Data', 'raw', 'peter_raw.fif'), trigger_dict)
+    assert isinstance(eeg_prep.raw, mne.io.fiff.raw.Raw)
+    eeg_prep.fix_channels(n_ext_channels=10,
+                          ext_ch_mapping={'EMG1a': 'emg',
+                                          'EMG1b': 'emg',
+                                          'FT10': 'emg',
+                                          'PO10': 'emg',
+                                          'HeRe': 'eog',
+                                          'HeLi': 'eog',
+                                          'VeUp': 'eog',
+                                          'VeDo': 'eog',
+                                          'STI 014': 'resp'})
+
+    eeg_prep.set_references(ref_ch=['PO9','FT9'],bipolar_dict=dict(
+                                              eye_horizontal=['HeRe', 'HeLi'],
+                                              eye_vertical=['VeUp', 'VeDo'],
+                                              right_hand=['PO10', 'FT10'],
+                                              left_hand=['EMG1b', 'EMG1a']))
+
+    eeg_prep.find_events(stim_channel='STI 014', consecutive=True, min_duration=.01)
+    assert eeg_prep.events is not None
+
+    print(eeg_prep.raw.ch_names)
+
+    eeg_prep.get_epochs(event_labels=['Stimulus'], tmin=-.5, tmax=2, baseline=(-.5,0))
+    eeg_prep.find_bad_epochs(selection_method='automatic')
+
+
+
+    # Saving data:
+    eeg_prep.save_prepared_data(save_path=os.path.join('Data', 'prepared'),
+                                overwrite=True)
+    pass  # TODO (peter): Implement test
+test_pipeline_peter_dat()
