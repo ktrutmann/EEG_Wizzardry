@@ -408,13 +408,34 @@ class EEGPrep(object):
     
     def deal_with_bad_channels(self, selection_method, plot=True, threshold_sd_of_mean=40, interpolate=True,
                                file_path=None, **kwargs):
-        # TODO (Laura): add description here
-        # TODO (Laura): Add slf.participant_id to file name
-        # TODO (Laura): check that bads is still a list
-
         """
-        ADD DESCRIPTION
-        Also explain what this is doing.
+        This method helps identifying and interpolating bad channels.
+        The identification can be done automatically, based on the channels' variance;
+        and manually, by selecting channels in the interactive plot.
+        Both results will be salved to file, for reproducibility.
+        With the "file" option, bad channels can be simply recovered from file.
+
+        Parameters
+        ----------
+        selection_method : string
+            Should be either "automatic", "manual", or "file"
+
+        plot : boolean, default True
+            Whether an interactive plot should be shown
+
+        threshold_sd_of_mean : real, default 40
+            Threshold to flag a channel as bad.
+            The SD of mean is calculated as the SD of the mean activation across epochs.
+            Channels with very high SD of mean across epochs are likely to be bad.
+
+        interpolate : boolean, default True
+            Whether the bad channels should be interpolated.
+            After interpolation, they are de-flagged as bad.
+
+        file_path : string, default None
+            The file path where the bad channel dataframe will be stored.
+            By default, it is saved in the WD.
+            Better to include the participant number in file name to avoid rewriting the same file.
         """
         
         if selection_method == "automatic":
@@ -434,15 +455,17 @@ class EEGPrep(object):
             for i in a[a > threshold_sd_of_mean].index:
                 self.raw.info['bads'].append(i)
 
-            print("Marked as bad: ", np.array(self.raw.info['bads']))
+            print("Marked as bad: ", self.raw.info['bads'])
 
             print("N marked as bad: ", len(self.raw.info['bads']))
 
             if file_path is None:
                 import os
                 file_path = os.getcwd()
-            file_name = os.path.join(file_path, 'bad_channels.csv')
-            pd.DataFrame(self.raw.info['bads'], columns=['bad_channels']).to_csv(path_or_buf=file_name)
+            file_name = os.path.join(file_path, 'bad_channels_pp{}.csv'.format(self.participant_id))
+            pd.DataFrame({'participant': self.participant_id,
+                          'bad_channels': self.raw.info['bads']}).to_csv(path_or_buf=file_name,
+                                                                         index=False)
 
             print("Saving bad channels as {}".format(file_name))
 
@@ -450,25 +473,27 @@ class EEGPrep(object):
             bads = pd.read_csv(file_path)
             self.raw.info['bads'] = bads['bad_channels'].values
 
-            print("Marked as bad: ", np.array(self.raw.info['bads']))
+            print("Marked as bad: ", self.raw.info['bads'])
 
             print("N marked as bad: ", len(self.raw.info['bads']))
 
         elif selection_method != "manual":
             ValueError("selection_method can be automatic, file, or manual")
 
-        if plot:
-            self.raw.plot() # allow interactive marking of bad channels??
+        if plot or selection_method == "manual":
+            self.raw.plot(block=True)
 
-            print("Marked as bad: ", np.array(self.raw.info['bads']))
+            print("Marked as bad: ", self.raw.info['bads'])
 
             print("N marked as bad: ", len(self.raw.info['bads']))
 
             if file_path is None:
                 import os
                 file_path = os.getcwd()
-            file_name = os.path.join(file_path, 'bad_channels.csv')
-            pd.DataFrame(self.raw.info['bads'], columns=['bad_channels']).to_csv(path_or_buf=file_name)
+            file_name = os.path.join(file_path, 'bad_channels_pp{}.csv'.format(self.participant_id))
+            pd.DataFrame({'participant': self.participant_id,
+                          'bad_channels': self.raw.info['bads']}).to_csv(path_or_buf=file_name,
+                                                                         index=False)
 
             print("Saving bad channels as {}".format(file_name))
 
