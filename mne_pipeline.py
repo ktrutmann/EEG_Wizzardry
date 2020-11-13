@@ -306,8 +306,6 @@ class EEGPrep(object):
         print('Created epochs using the provided event ids and / or labels.')
 
     def get_epochs_df(self, event_labels, **kwargs):
-        # TODO (Laura): rename condition columns
-        
         """
         Gets epoch data as pandas DataFrames, given a list of event labels.
 
@@ -336,7 +334,7 @@ class EEGPrep(object):
 
         epochs = mne.Epochs(self.raw,
                             events=self.events,
-                            event_id=[self.trigger_dict[event] for event in event_labels],
+                            event_id=dict((k, self.trigger_dict[k]) for k in event_labels),
                             **kwargs)
 
         df = epochs.to_data_frame()
@@ -501,8 +499,6 @@ class EEGPrep(object):
             "Interpolating bad channels..."
             if len(self.raw.info['bads']) > 0:
                 self.raw.interpolate_bads(reset_bads=True)
-
-# TODO: Maybe have a function to plot raw data to files.
 
     def deal_with_bad_epochs(self, selection_method='automatic', scale_params='default', drop_epochs=False, file_name=None):
         """
