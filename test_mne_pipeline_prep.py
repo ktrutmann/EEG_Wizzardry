@@ -1,5 +1,5 @@
 import mne
-import mne_pipeline
+import mne_pipeline_prep
 import os
 import pandas as pd
 
@@ -40,7 +40,7 @@ def test_pipeline_kev_dat():
     assert eeg_prep.epochs.events.shape[0] == len(data_frame.index.levels[2])
 
 
-    # TODO: Test the other methods as soon as they are implemented
+    # TODO (Kevin): Write a test for each method!
 
     # TODO (Kevin): Test saving epochs and whether **kwargs should also be passed on to that
     # Saving data:
@@ -49,6 +49,7 @@ def test_pipeline_kev_dat():
 
 
 def test_pipeline_laura_dat():
+    # TODO (Laura): Write a test for each method!
     events_id = dict(show_options=2,
                      start_choice=4,
                      end_choice=8,
@@ -95,6 +96,7 @@ def test_pipeline_laura_dat():
     
     
 def test_pipeline_peter_dat():
+    # TODO (Peter): Write a test for each method!
     trigger_dict = {'Stimulus': 36, 'Left_choice': 62, 'Right_choice': 64}
     # Reading in the data:
     eeg_prep = mne_pipeline.EEGPrep(os.path.join('Data', 'raw', 'peter_raw.fif'), trigger_dict)
@@ -109,9 +111,9 @@ def test_pipeline_peter_dat():
                                           'VeUp': 'eog',
                                           'VeDo': 'eog',
                                           'STI 014': 'resp'},
-                          montage_path = '/usr/local/lib/python3.7/site-packages/mne/channels/data/montages')
+                          montage_path='/usr/local/lib/python3.7/site-packages/mne/channels/data/montages')
 
-    eeg_prep.set_references(ref_ch=['PO9','FT9'],bipolar_dict=dict(
+    eeg_prep.set_references(ref_ch=['PO9', 'FT9'], bipolar_dict=dict(
                                               eye_horizontal=['HeRe', 'HeLi'],
                                               eye_vertical=['VeUp', 'VeDo'],
                                               right_hand=['PO10', 'FT10'],
@@ -120,9 +122,9 @@ def test_pipeline_peter_dat():
     eeg_prep.find_events(stim_channel='STI 014', consecutive=True, min_duration=.01)
     assert eeg_prep.events is not None
 
-
-    eeg_prep.get_epochs(event_labels=['Stimulus'], tmin=-.5, tmax=2, baseline=(-.5,0))
-    eeg_prep.deal_with_bad_epochs(selection_method='file',drop_epochs=True,file_name='/Users/peterkraemer/PycharmProjects/EEG_Wizzardry/Data/prepared/test1')
+    eeg_prep.get_epochs(event_labels=['Stimulus'], tmin=-.5, tmax=2, baseline=(-.5, 0))
+    eeg_prep.deal_with_bad_epochs(selection_method='file', drop_epochs=True,
+                                  file_name='/Users/peterkraemer/PycharmProjects/EEG_Wizzardry/Data/prepared/test1')
 
     # Saving data:
     eeg_prep.save_prepared_data(save_path=os.path.join('Data', 'prepared'),
