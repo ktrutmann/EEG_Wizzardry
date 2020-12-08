@@ -1,5 +1,5 @@
 import mne
-import mne_pipeline_prep
+import mne_pipeline
 import os
 import pandas as pd
 
@@ -12,13 +12,14 @@ def test_pipeline_kev_dat():
                                     participant_identifier='test_case')
     assert isinstance(eeg_prep.raw, mne.io.fiff.raw.Raw)
 
-    eeg_prep.fix_channels(n_ext_channels=9,
-                          ext_ch_mapping=None)
+    eeg_prep.fix_channels(n_ext_channels=9, ext_ch_mapping=None)
 
     eeg_prep.set_references(bipolar_dict=dict(eye_horizontal=['PO10', 'FT10'],
                                               eye_vertical=['HeRe', 'FT10'],
                                               right_hand=['HeLi', 'VeDo'],
                                               left_hand=['VeUp', 'EMG1a']))
+
+    eeg_prep.set_montage()
 
     eeg_prep.find_events(stim_channel='Status', consecutive=True, min_duration=.01)
     assert eeg_prep.events is not None
@@ -39,8 +40,19 @@ def test_pipeline_kev_dat():
     assert eeg_prep.epochs.info['nchan'] + 1 == data_frame.shape[1]
     assert eeg_prep.epochs.events.shape[0] == len(data_frame.index.levels[2])
 
+    eeg_prep.deal_with_bad_channels(selection_method='automatic', threshold_sd_of_mean=40,
+                                    interpolate=False, file_name=os.path.join('Data', 'bads'))
 
-    # TODO (Kevin): Write a test for each method!
+    # Testing whether getting bad channels from the file also works:
+    eeg_prep.deal_with_bad_channels(selection_method='file', interpolate=True,
+                                    file_path=os.path.join('Data', 'bads'))
+
+    eeg_prep.deal_with_bad_epochs(selection_method='automatic', drop_epochs=False,
+                                  file_path=os.path.join('Data', 'bads'))
+
+    # Testing whether getting bad epochs from the file also works:
+    eeg_prep.deal_with_bad_epochs(selection_method='file', drop_epochs=True,
+                                  file_path=os.path.join('Data', 'bads'))
 
     # TODO (Kevin): Test saving epochs and whether **kwargs should also be passed on to that
     # Saving data:

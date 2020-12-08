@@ -50,8 +50,10 @@ class EEGPrep(object):
             self.raw = mne.io.read_raw_bdf(self.eeg_path, preload=True)
         elif eeg_path.endswith('.fif'):
             self.raw = mne.io.read_raw_fif(self.eeg_path, preload=True)
+        else:
+            raise ValueError('Please provide a .bdf or .fif file.')
 
-    def fix_channels(self, n_ext_channels=None, ext_ch_mapping=None, montage_path=None):
+    def fix_channels(self, n_ext_channels=None, ext_ch_mapping=None):
         """
         Removes the '1-' from the start of the channel names, sets the Montage (telling MNE which electrode went where)
         and sets the type of the additional electrodes. For the fixing of the channel names it is assumed that the
@@ -70,9 +72,6 @@ class EEGPrep(object):
             `n_ext_channels` is overwritten to 9. The default dictionary is as follows:
             `{'FT10': 'eog', 'PO10': 'eog', 'HeRe': 'eog', 'HeLi': 'emg', 'VeUp': 'emg', 'VeDo': 'emg',
              'EMG1a': 'emg', 'Status': 'resp'}`
-
-        montage_path : str, optional
-            If "None", a standard montage (biosemi64) is used. Alternatively, a customized montage is loaded and applied.
         """
 
         if ext_ch_mapping is None:
@@ -82,6 +81,7 @@ class EEGPrep(object):
             n_ext_channels = 9
             warnings.warn('You are using the default mapping for the extra channels!\n' +
                           'Please make sure it is the correct one for your use case.', UserWarning)
+            # TODO: Check whether this warning is displayed
 
         # Removing superfluous '1-' in ch_names
         for name in self.raw.ch_names[:-1]:
@@ -90,28 +90,10 @@ class EEGPrep(object):
         # Drop unused channels
         self.raw.drop_channels(self.raw.ch_names[64 + n_ext_channels:len(self.raw.ch_names) - 1])
 
-        # Set montage
-        if montage_path == None:
-            try:
-                montage = mne.channels.read_montage(kind='biosemi64')
-            except:
-                montage = mne.channels.make_standard_montage(kind='biosemi64')
-            print('Using default montage biosemi64')
-        else:
-            try:
-                montage = mne.channels.read_montage(kind='biosemi64', path=montage_path)
-            except:
-                mne.channels.read_custom_montage(fname=montage_path)
-        # TODO: needs to be tested for mne versions > 0.17
-
-        self.raw.set_montage(montage)
-        # TODO (Kevin): This raises a deprecation warning. How else can we set the montage?
-
-
         # Set channel types
         self.raw.set_channel_types(mapping=ext_ch_mapping)
 
-        print('Fixed channel names, dropped unused channels, changed channel types and set montage.')
+        print('Fixed channel names, dropped unused channels and changed channel types.')
 
     def set_references(self, ref_ch=None, bipolar_dict=None):
         """
@@ -124,7 +106,7 @@ class EEGPrep(object):
             A dictionary containing the name of the new channel as key and the to-be-referenced channels as values.
             dict(EMG_right=['PO10','FT10'],
                 EMG_left=['EMG1b','EMG1a'],
-                EOG_x=['HeRe', 'HeLi'],
+                EOG_x=['HeRe', ' HeLi'],
                 EOG_y=['VeUp', 'VeDo'])
 
         ref_ch: list, optional
@@ -143,6 +125,33 @@ class EEGPrep(object):
 
         self.raw.set_eeg_reference(ref_channels=ref_ch)
         self.raw.drop_channels(ref_ch)
+
+    def set_montage(self, montage_path=None, montage_kind='biosemi64'):
+        """
+        Parameters
+        ----------
+        montage_path: str
+            The path to a custom montage, if desired.
+
+        montage_kind: str
+            Defaults to 'biosemi64' but can be any inbuilt montage of mne.
+        """
+        # Set montage
+        if montage_path is None:
+            try:
+                montage = mne.channels.read_montage(kind=montage_kind)
+            except:
+                montage = mne.channels.make_standard_montage(kind=montage_kind)
+            print('Using default montage biosemi64')
+        else:
+            try:
+                montage = mne.channels.read_montage(kind=montage_kind, path=montage_path)
+            except:
+                montage = mne.channels.read_custom_montage(fname=montage_path)
+        # TODO: needs to be tested for mne versions > 0.17
+
+        # Needs to be able to handle different mne versions:
+        self.raw.set_montage(montage)
 
     def find_events(self, **kwargs):
         """
@@ -364,49 +373,6 @@ class EEGPrep(object):
         self.raw.notch_filter(range(notch_freq, high_freq, notch_freq), filter_length='auto',
                               phase='zero', fir_design='firwin')
 
-    def save_prepared_data(self, save_path='', save_events=False, save_epochs=False, **kwargs):
-        """
-        This method saves the prepared raw data and (optionally) the epochs.
-        It can also save the events as a pickle file so it can easily be reused later.
-
-        Parameters
-        ----------
-        save_path: string, optional
-            A path to the folder where the data should be saved in. If not provided, the file will be saved in the
-            directory the script is run from.
-
-        save_events: boolean, optional
-            Indicates whether the found events should be saved as pickle files as well.
-
-        save_epochs: boolean, optional
-            Indicates whether the created epochs should be saved as well.
-
-        kwargs: dict, optional
-            Will be passed on to the raw.save() method.
-        """
-
-        file_path_and_name = os.path.join(save_path, '{}_prepared_raw.fif'.format(self.participant_id))
-        self.raw.save(file_path_and_name, **kwargs)
-        print('Saved the prepared raw file to {}.'.format(file_path_and_name))
-
-        if save_events:
-            if self.events is None:
-                raise AttributeError('No events to save. Please find them by running the find_events() method first.')
-
-            file_path_and_name = os.path.join(save_path, '{}_events.pickle'.format(self.participant_id))
-            pickle_file = open(file_path_and_name, 'wb')
-            pickle.dump(self.events, pickle_file)
-            pickle_file.close()
-            print('Saved the events to {}.'.format(file_path_and_name))
-
-        if save_epochs:
-            if self.epochs is None:
-                raise AttributeError('You have not created any epochs yet.\n'
-                                     'Create them by running the make_epochs() method first.')
-
-            file_path_and_name = os.path.join(save_path, '{}_epochs.fif'.format(self.participant_id))
-            self.epochs.save(file_path_and_name)
-    
     def deal_with_bad_channels(self, selection_method, plot=True, threshold_sd_of_mean=40, interpolate=True,
                                file_path=None, **kwargs):
         """
@@ -434,15 +400,21 @@ class EEGPrep(object):
             After interpolation, they are de-flagged as bad.
 
         file_path : string, default None
-            The file path where the bad channel dataframe will be stored.
-            By default, it is saved in the WD.
-            Better to include the participant number in file name to avoid rewriting the same file.
+            The file path where the bad channel list will be stored as a .csv file.
+            By default, it is saved in the current working directory.
         """
+
+        if file_path is None:
+            file_path = os.getcwd()
+        file_name = os.path.join(file_path, 'participant_{}_bad_channels.csv'.format(self.participant_id))
         
         if selection_method == "automatic":
-            df = self.get_epochs_df(picks=mne.pick_types(self.raw.info, eeg=True),
-                                    **kwargs)
+            if self.epochs is None:
+                raise AttributeError('Please create epochs first, as the automatic algorithm needs them to work.')
+            else:
+                df = self.epochs.to_data_frame()
 
+            # TODO: (Discuss) Why also group by condition and shouldn't we take the mean of the abs. amplitude?
             group = df.groupby(['condition', 'epoch'])
             mean = group.mean()
 
@@ -460,10 +432,6 @@ class EEGPrep(object):
 
             print("N marked as bad: ", len(self.raw.info['bads']))
 
-            if file_path is None:
-                import os
-                file_path = os.getcwd()
-            file_name = os.path.join(file_path, 'bad_channels_pp{}.csv'.format(self.participant_id))
             pd.DataFrame({'participant': self.participant_id,
                           'bad_channels': self.raw.info['bads']}).to_csv(path_or_buf=file_name,
                                                                          index=False)
@@ -471,7 +439,7 @@ class EEGPrep(object):
             print("Saving bad channels as {}".format(file_name))
 
         elif selection_method == "file":
-            bads = pd.read_csv(file_path)
+            bads = pd.read_csv(file_name)
             self.raw.info['bads'] = bads['bad_channels'].values
 
             print("Marked as bad: ", self.raw.info['bads'])
@@ -489,9 +457,8 @@ class EEGPrep(object):
             print("N marked as bad: ", len(self.raw.info['bads']))
 
             if file_path is None:
-                import os
                 file_path = os.getcwd()
-            file_name = os.path.join(file_path, 'bad_channels_pp{}.csv'.format(self.participant_id))
+            file_name = os.path.join(file_path, 'participant_{}_bad_channels.csv'.format(self.participant_id))
             pd.DataFrame({'participant': self.participant_id,
                           'bad_channels': self.raw.info['bads']}).to_csv(path_or_buf=file_name,
                                                                          index=False)
@@ -503,7 +470,8 @@ class EEGPrep(object):
             if len(self.raw.info['bads']) > 0:
                 self.raw.interpolate_bads(reset_bads=True)
 
-    def deal_with_bad_epochs(self, selection_method='automatic', scale_params='default', drop_epochs=False, file_name=None):
+    def deal_with_bad_epochs(self, selection_method='automatic', scale_params='default',
+                             drop_epochs=False, file_path=None):
         """
         This method identifies epochs that will be rejected for further analysis
 
@@ -511,25 +479,31 @@ class EEGPrep(object):
         ----------
         selection_method: string, optional
             use automatic or manual epoch detection. When using file, epochs get selected from a specified file.
-        scale_params = dict, optional
-            parameters to depict epochs in a visually accessible way
+
+        scale_params: dict, optional
+            parameters passed to the plot function to depict epochs in a visually accessible way
+            if selection_method "manual" is chosen.
+
         drop_epochs: bool, optional
             directly remove epochs from EEG data
-        file_name: string, optional
-            allows to specify the file name of the output file. Also used if selection_method == file.
+
+        file_path: string, optional
+            allows to specify the location of the output file. Also used if selection_method is "file".
+            By default the file is stored in the current working directory.
         """
         if scale_params == 'default':
             scale_params = dict(mag=1e-12, grad=4e-11, eeg=150e-6, eog=25e-5, ecg=5e-4,
                                 emg=1e-3, ref_meg=1e-12, misc=1e-3, stim=1, resp=1, chpi=1e-4,
                                 whitened=10.)
-        if file_name is None:
-            file_name = os.path.join(os.getcwd(), 'participant_%s_bad_epochs.csv'%self.participant_id)
+        if file_path is None:
+            file_path = os.getcwd()
+        file_name = os.path.join(file_path, 'participant_{}_bad_epochs.csv'.format(self.participant_id))
 
         epochs_copy = self.epochs.copy()
         if selection_method == 'automatic':
             epochs_copy.drop_bad()
         elif selection_method == 'manual':
-            epochs_copy.plot(n_channels=68, scalings=scale_params,block=True)
+            epochs_copy.plot(n_channels=68, scalings=scale_params, block=True)
         elif selection_method == 'file':
             epochs_to_be_dropped = pd.read_csv(file_name).epochs.to_list()
             epochs_copy.drop(epochs_to_be_dropped)
@@ -551,3 +525,46 @@ class EEGPrep(object):
             self.epochs.drop(epochs_dropped)
 
         del epochs_copy
+
+    def save_prepared_data(self, save_path='', save_events=False, save_epochs=False, **kwargs):
+        """
+        This method saves the prepared raw data and (optionally) the epochs.
+        It can also save the events as a pickle file so it can easily be reused later.
+
+        Parameters
+        ----------
+        save_path: string, optional
+            A path to the folder where the data should be saved in. If not provided, the file will be saved in the
+            directory the script is run from.
+
+        save_events: boolean, optional
+            Indicates whether the found events should be saved as pickle files as well.
+
+        save_epochs: boolean, optional
+            Indicates whether the created epochs should be saved as well.
+
+        kwargs: dict, optional
+            Will be passed on to the raw.save() method.
+        """
+
+        file_path_and_name = os.path.join(save_path, 'participant_{}_prepared_raw.fif'.format(self.participant_id))
+        self.raw.save(file_path_and_name, **kwargs)
+        print('Saved the prepared raw file to {}.'.format(file_path_and_name))
+
+        if save_events:
+            if self.events is None:
+                raise AttributeError('No events to save. Please find them by running the find_events() method first.')
+
+            file_path_and_name = os.path.join(save_path, '{}_events.pickle'.format(self.participant_id))
+            pickle_file = open(file_path_and_name, 'wb')
+            pickle.dump(self.events, pickle_file)
+            pickle_file.close()
+            print('Saved the events to {}.'.format(file_path_and_name))
+
+        if save_epochs:
+            if self.epochs is None:
+                raise AttributeError('You have not created any epochs yet.\n'
+                                     'Create them by running the make_epochs() method first.')
+
+            file_path_and_name = os.path.join(save_path, 'participant_{}_epochs.fif'.format(self.participant_id))
+            self.epochs.save(file_path_and_name)
