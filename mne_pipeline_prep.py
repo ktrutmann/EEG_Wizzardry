@@ -353,7 +353,7 @@ class EEGPrep(object):
 
             df = df.append(tmp)
         df['participant'] = self.participant_id
-        df = df.reset_index().set_index(['participant', 'condition', 'epoch', 'time'])
+        df = df.reset_index().set_index(['participant', 'condition', 'epoch', 'time']).drop(columns='Status')
 
         return df
 
