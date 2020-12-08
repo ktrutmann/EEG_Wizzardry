@@ -90,6 +90,8 @@ def test_pipeline_laura_dat():
                                      right_hand=['HeLi', 'VeDo'],
                                      left_hand=['VeUp', 'EMG1a']))
     
+    eeg_prep.set_montage()
+    
     data_preprocessed.filters(low_freq=.1, high_freq=100, notch_freq=50)
     
     data_preprocessed.find_events(stim_channel='Status')
@@ -107,20 +109,18 @@ def test_pipeline_laura_dat():
     data_preprocessed.deal_with_bad_channels(selection_method='automatic',
                                              threshold_sd_of_mean=40,
                                              event_labels=['show_options', 'start_choice', 'feedback'],
+                                             file_path=os.path.join('Data', 'bads'),
                                              interpolate=False,
                                              plot=True,
                                              tmin=-.5,
                                              tmax=3)
     print("Bad channels after automatic selection, no interpolation: ", data_preprocessed.raw.info['bads'])
     
-    data_preprocessed.deal_with_bad_channels(selection_method='automatic',
-                                             threshold_sd_of_mean=40,
-                                             event_labels=['show_options', 'start_choice', 'feedback'],
+    data_preprocessed.deal_with_bad_channels(selection_method='file',
                                              interpolate=True,
-                                             plot=True,
-                                             tmin=-.5,
-                                             tmax=3)
-    print("Bad channels after automatic selection & interpolation: ", data_preprocessed.raw.info['bads'])
+                                             file_path=os.path.join('Data', 'bads'))
+    
+    print("Bad channels after getting from file & interpolation: ", data_preprocessed.raw.info['bads'])
     
     data_preprocessed.find_ica_components()
     data_preprocessed.remove_ica_components(reject_from_file=False, reject_list_file_location='test_outputs')
