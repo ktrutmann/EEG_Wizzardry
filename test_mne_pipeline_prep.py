@@ -36,7 +36,7 @@ def test_pipeline_kev_dat():
     data_frame = eeg_prep.get_epochs_df(event_labels=events_to_be_used, tmin=-1.5, tmax=.2, baseline=(-1.5, -1.2))
     assert isinstance(data_frame, pd.DataFrame)
 
-    # Assert that they have the same number of chanels and number of events
+    # Assert that they have the same number of channels and number of events
     assert eeg_prep.epochs.info['nchan'] + 1 == data_frame.shape[1]
     assert eeg_prep.epochs.events.shape[0] == len(data_frame.index.levels[2])
 

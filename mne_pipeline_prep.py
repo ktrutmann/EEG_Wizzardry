@@ -287,9 +287,7 @@ class EEGPrep(object):
                 self.ica.exclude))
             self.ica.apply(self.epochs, exclude=self.ica.exclude, **kwargs)
 
-    def get_epochs(self, event_labels, **kwargs):
-        # TODO (Discuss): Why not add a `as_df` argument here and merge with `get_epochs_df`?
-        # TODO (Peter): Test how mne handles multiple conditions (i.e. left/right button). Does it retain the order?
+    def get_epochs(self, event_labels, return_df=False, **kwargs):
         """
         This method creates the epochs from the events found previously by calling the `make_events` method.
 
@@ -317,45 +315,18 @@ class EEGPrep(object):
                                  **kwargs)
         print('Created epochs using the provided event ids and / or labels.')
 
-    def get_epochs_df(self, event_labels, **kwargs):
-        """
-        Gets epoch data as pandas DataFrames, given a list of event labels.
-
-        Parameters
-        ----------
-        event_labels: array or list
-            Labels corresponding to the events that you want to select.
-
-        kwargs : keyword arguments
-            All keyword arguments are passed to mne.Epochs().
-            See: https://mne.tools/stable/generated/mne.Epochs.html#mne.Epochs.
-
-        Returns
-        -------
-        df : DataFrame
-            A dataframe suitable for usage with other statistical/plotting/analysis packages.
-
-        """
-        if self.events is None:
-            raise AttributeError('No events found. Please find them by running the find_events() method first.')
-
-        for event in event_labels:
-            if event not in self.trigger_dict.keys():
-                raise ValueError('{} in event_labels is not one of the your event names. Those are {}'.format(
-                    event, self.trigger_dict.keys()))
-
-        df = pd.DataFrame([])
-        for k in event_labels:
-            tmp = mne.Epochs(self.raw,
-                                events=self.events,
-                                event_id= {k: self.trigger_dict[k]},
-                                **kwargs).to_data_frame()
-
-            df = df.append(tmp)
-        df['participant'] = self.participant_id
-        df = df.reset_index().set_index(['participant', 'condition', 'epoch', 'time']).drop(columns='Status')
-
-        return df
+        if return_df:
+            # TODO: Test if this does not work with just transforming self.epochs
+            df = pd.DataFrame([])
+            for k in event_labels:
+                tmp = mne.Epochs(self.raw,
+                                 events=self.events,
+                                 event_id={k: self.trigger_dict[k]},
+                                 **kwargs).to_data_frame()
+                df = df.append(tmp)
+            df['participant'] = self.participant_id
+            df = df.reset_index().set_index(['participant', 'condition', 'epoch', 'time']).drop(columns='Status')
+            return df
 
     def filters(self, low_freq=1/7, high_freq=128, notch_freq=50):
         """
@@ -377,6 +348,7 @@ class EEGPrep(object):
 
     def deal_with_bad_channels(self, selection_method, plot=True, threshold_sd_of_mean=40, interpolate=True,
                                file_path=None):
+        # TODO: (Everyone) Check how well the automatic detection works on your data
         """
         This method helps identifying and interpolating bad channels.
         The identification can be done automatically, based on the channels' variance;
@@ -416,8 +388,7 @@ class EEGPrep(object):
             else:
                 df = self.epochs.to_data_frame()
 
-            # TODO (Discuss): Why also group by condition and shouldn't we take the mean of the abs. amplitude?
-            group = df.groupby(['condition', 'epoch'])
+            group = df.groupby('epoch')
             mean = group.mean()
 
             a = mean.std()
@@ -506,7 +477,7 @@ class EEGPrep(object):
             epochs_copy.drop_bad()
         elif selection_method == 'manual':
             epochs_copy.plot(n_channels=68, scalings=scale_params, block=True)
-            # TODO: Does the hand picking actualy work here?
+            # TODO: Does the hand picking actually work here?
         elif selection_method == 'file':
             epochs_to_be_dropped = pd.read_csv(file_name).epochs.to_list()
             epochs_copy.drop(epochs_to_be_dropped)
