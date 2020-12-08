@@ -60,7 +60,6 @@ def test_pipeline_kev_dat():
 
 
 def test_pipeline_laura_dat():
-    # TODO (Laura): Write a test for each method!
     events_id = dict(show_options=2,
                      start_choice=4,
                      end_choice=8,
@@ -68,42 +67,63 @@ def test_pipeline_laura_dat():
                      feedback_null=32,
                      end_trial=64)
     
-    data_preprocessed = mne_pipeline.EEGPrep(
-        eeg_path='Data/raw/laura_raw.fif', trigger_dict=events_id, participant_identifier=1)
+    data_preprocessed = mne_pipeline.EEGPrep(eeg_path = 'Data/raw/laura_raw.fif', 
+                                             trigger_dict = events_id, 
+                                             participant_identifier=1)
     assert isinstance(data_preprocessed.raw, mne.io.fiff.raw.Raw)
     
     data_preprocessed.fix_channels(
-        ext_ch_mapping={'FT10': 'eog',
-                        'PO10': 'eog',
-                        'HeRe': 'eog',
-                        'HeLi': 'emg',
-                        'VeUp': 'emg',
-                        'VeDo': 'emg',
-                        'EMG1a': 'emg',
-                        'Status': 'resp'},
-        n_ext_channels=9)
+        ext_ch_mapping = {'FT10': 'eog', 
+                          'PO10': 'eog', 
+                          'HeRe': 'eog', 
+                          'HeLi': 'emg', 
+                          'VeUp': 'emg', 
+                          'VeDo': 'emg',
+                          'EMG1a': 'emg', 
+                          'Status': 'resp'},
+        n_ext_channels = 9)
     
-    data_preprocessed.set_references(ref_ch=['FT9', 'PO9'],
-                                     bipolar_dict=dict(
-                                         eye_horizontal=['PO10', 'FT10'],
-                                         eye_vertical=['HeRe', 'FT10'],
-                                         right_hand=['HeLi', 'VeDo'],
-                                         left_hand=['VeUp', 'EMG1a']))
+    data_preprocessed.set_references(ref_ch = ['FT9', 'PO9'], 
+                                     bipolar_dict = dict(
+                                     eye_horizontal=['PO10', 'FT10'],
+                                     eye_vertical=['HeRe', 'FT10'],
+                                     right_hand=['HeLi', 'VeDo'],
+                                     left_hand=['VeUp', 'EMG1a']))
     
     data_preprocessed.filters(low_freq=.1, high_freq=100, notch_freq=50)
     
     data_preprocessed.find_events(stim_channel='Status')
     assert data_preprocessed.events is not None
     
-    epochs_df = data_preprocessed.get_epochs_df(event_labels=['start_choice', 'feedback'])
-    print(epochs_df.head())
+    epochs = mne.Epochs(data_preprocessed.raw,
+                        events=data_preprocessed.events)
+    print("Size of epochs object with previously found events: ", epochs.get_data().shape)
     
-    # data_preprocessed.automatic_bad_channel_marking(interpolate=True,
-    #                                                 threshold_sd_of_mean=40,
-    #                                                 event_labels=['show_options', 'start_choice', 'feedback'],
-    #                                                 tmin=-.5,
-    #                                                 tmax=3)
+    epochs = data_preprocessed.get_epochs_df(event_labels=['start_choice', 'feedback'])
+    print("Index epochs df object (only 2 type of events): ", epochs.index)
+    
+    print("Bad channels before doing anything: ", data_preprocessed.raw.info['bads'])
+    
+    data_preprocessed.deal_with_bad_channels(selection_method='automatic',
+                                             threshold_sd_of_mean=40,
+                                             event_labels=['show_options', 'start_choice', 'feedback'],
+                                             interpolate=False,
+                                             plot=True,
+                                             tmin=-.5,
+                                             tmax=3)
+    print("Bad channels after automatic selection, no interpolation: ", data_preprocessed.raw.info['bads'])
+    
+    data_preprocessed.deal_with_bad_channels(selection_method='automatic',
+                                             threshold_sd_of_mean=40,
+                                             event_labels=['show_options', 'start_choice', 'feedback'],
+                                             interpolate=True,
+                                             plot=True,
+                                             tmin=-.5,
+                                             tmax=3)
+    print("Bad channels after automatic selection & interpolation: ", data_preprocessed.raw.info['bads'])
+    
     data_preprocessed.find_ica_components()
+    data_preprocessed.remove_ica_components(reject_from_file=False, reject_list_file_location='test_outputs')
     
     
 def test_pipeline_peter_dat():
