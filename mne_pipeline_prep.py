@@ -36,7 +36,8 @@ class EEGPrep(object):
             mne class for raw data.
             See: https://mne.tools/stable/generated/mne.io.Raw.html#mne.io.Raw
         """
-        self.eeg_path = eeg_path
+        # TODO: Expand on attributes in docstring
+
         self.trigger_dict = trigger_dict
         self.participant_id = participant_identifier
         self.events = None
@@ -47,9 +48,9 @@ class EEGPrep(object):
 
         # import data
         if eeg_path.endswith('.bdf'):
-            self.raw = mne.io.read_raw_bdf(self.eeg_path, preload=True)
+            self.raw = mne.io.read_raw_bdf(eeg_path, preload=True)
         elif eeg_path.endswith('.fif'):
-            self.raw = mne.io.read_raw_fif(self.eeg_path, preload=True)
+            self.raw = mne.io.read_raw_fif(eeg_path, preload=True)
         else:
             raise ValueError('Please provide a .bdf or .fif file.')
 
@@ -375,7 +376,7 @@ class EEGPrep(object):
                               phase='zero', fir_design='firwin')
 
     def deal_with_bad_channels(self, selection_method, plot=True, threshold_sd_of_mean=40, interpolate=True,
-                               file_path=None, **kwargs):
+                               file_path=None):
         """
         This method helps identifying and interpolating bad channels.
         The identification can be done automatically, based on the channels' variance;
@@ -415,7 +416,7 @@ class EEGPrep(object):
             else:
                 df = self.epochs.to_data_frame()
 
-            # TODO: (Discuss) Why also group by condition and shouldn't we take the mean of the abs. amplitude?
+            # TODO (Discuss): Why also group by condition and shouldn't we take the mean of the abs. amplitude?
             group = df.groupby(['condition', 'epoch'])
             mean = group.mean()
 
@@ -505,6 +506,7 @@ class EEGPrep(object):
             epochs_copy.drop_bad()
         elif selection_method == 'manual':
             epochs_copy.plot(n_channels=68, scalings=scale_params, block=True)
+            # TODO: Does the hand picking actualy work here?
         elif selection_method == 'file':
             epochs_to_be_dropped = pd.read_csv(file_name).epochs.to_list()
             epochs_copy.drop(epochs_to_be_dropped)
@@ -567,5 +569,5 @@ class EEGPrep(object):
                 raise AttributeError('You have not created any epochs yet.\n'
                                      'Create them by running the make_epochs() method first.')
 
-            file_path_and_name = os.path.join(save_path, 'participant_{}_epochs.fif'.format(self.participant_id))
+            file_path_and_name = os.path.join(save_path, 'participant_{}-epo.fif'.format(self.participant_id))
             self.epochs.save(file_path_and_name)

@@ -41,7 +41,7 @@ def test_pipeline_kev_dat():
     assert eeg_prep.epochs.events.shape[0] == len(data_frame.index.levels[2])
 
     eeg_prep.deal_with_bad_channels(selection_method='automatic', threshold_sd_of_mean=40,
-                                    interpolate=False, file_name=os.path.join('Data', 'bads'))
+                                    interpolate=False, file_path=os.path.join('Data', 'bads'))
 
     # Testing whether getting bad channels from the file also works:
     eeg_prep.deal_with_bad_channels(selection_method='file', interpolate=True,
@@ -54,9 +54,8 @@ def test_pipeline_kev_dat():
     eeg_prep.deal_with_bad_epochs(selection_method='file', drop_epochs=True,
                                   file_path=os.path.join('Data', 'bads'))
 
-    # TODO (Kevin): Test saving epochs and whether **kwargs should also be passed on to that
     # Saving data:
-    eeg_prep.save_prepared_data(save_path=os.path.join('Data', 'prepared'),
+    eeg_prep.save_prepared_data(save_path=os.path.join('Data', 'prepared'), save_epochs=True, save_events=True,
                                 overwrite=True)
 
 
