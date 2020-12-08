@@ -317,7 +317,6 @@ class EEGPrep(object):
         print('Created epochs using the provided event ids and / or labels.')
 
     def get_epochs_df(self, event_labels, **kwargs):
-        # TODO (Laura): Suspected bug. Do we get all conditions and meta information back?
         """
         Gets epoch data as pandas DataFrames, given a list of event labels.
 
@@ -344,12 +343,14 @@ class EEGPrep(object):
                 raise ValueError('{} in event_labels is not one of the your event names. Those are {}'.format(
                     event, self.trigger_dict.keys()))
 
-        epochs = mne.Epochs(self.raw,
-                            events=self.events,
-                            event_id=dict((k, self.trigger_dict[k]) for k in event_labels),
-                            **kwargs)
+        df = pd.DataFrame([])
+        for k in event_labels:
+            tmp = mne.Epochs(self.raw,
+                                events=self.events,
+                                event_id= {k: self.trigger_dict[k]},
+                                **kwargs).to_data_frame()
 
-        df = epochs.to_data_frame()
+            df = df.append(tmp)
         df['participant'] = self.participant_id
         df = df.reset_index().set_index(['participant', 'condition', 'epoch', 'time'])
 
