@@ -5,6 +5,7 @@ import pandas as pd
 
 
 def test_pipeline_kev_dat():
+    #TODISCUSS: Peter gets an AttributeError: 'EEGPrep' object has no attribute 'get_epochs_df' when running Kevins tests.
     trigger_dict = {'Masked': 2, 'Reveal': 4, 'Left_choice': 8, 'Right_choice': 16, 'No_choice': 32}
 
     # Reading in the data:
@@ -60,6 +61,7 @@ def test_pipeline_kev_dat():
 
 
 def test_pipeline_laura_dat():
+    #TODISCUSS: Peter cannot run Lauras pipeline. Pipeline doesn't define the eeg_prep object.
     events_id = dict(show_options=2,
                      start_choice=4,
                      end_choice=8,
@@ -130,8 +132,10 @@ def test_pipeline_peter_dat():
     # TODO (Peter): Write a test for each method!
     trigger_dict = {'Stimulus': 36, 'Left_choice': 62, 'Right_choice': 64}
     # Reading in the data:
-    eeg_prep = mne_pipeline.EEGPrep(os.path.join('Data', 'raw', 'peter_raw.fif'), trigger_dict)
-    assert isinstance(eeg_prep.raw, mne.io.fiff.raw.Raw)
+    eeg_prep = mne_pipeline.EEGPrep(os.path.join('Data', 'raw', 'peter_raw.fif'), trigger_dict,participant_identifier='xxx')
+    print('Test result: defining eeg_prep object works')
+
+    #assert isinstance(eeg_prep.raw, mne.io.fiff.raw.Raw)
     eeg_prep.fix_channels(n_ext_channels=10,
                           ext_ch_mapping={'EMG1a': 'emg',
                                           'EMG1b': 'emg',
@@ -141,8 +145,11 @@ def test_pipeline_peter_dat():
                                           'HeLi': 'eog',
                                           'VeUp': 'eog',
                                           'VeDo': 'eog',
-                                          'STI 014': 'resp'},
-                          montage_path='/usr/local/lib/python3.7/site-packages/mne/channels/data/montages')
+                                          'STI 014': 'resp'})
+    assert isinstance(eeg_prep.raw, mne.io.fiff.raw.Raw)
+
+    eeg_prep.set_montage(montage_path='/usr/local/lib/python3.7/site-packages/mne/channels/data/montages', montage_kind='biosemi64')
+    #assert eeg_prep.ica is not None
 
     eeg_prep.set_references(ref_ch=['PO9', 'FT9'], bipolar_dict=dict(
                                               eye_horizontal=['HeRe', 'HeLi'],
@@ -150,12 +157,31 @@ def test_pipeline_peter_dat():
                                               right_hand=['PO10', 'FT10'],
                                               left_hand=['EMG1b', 'EMG1a']))
 
+
     eeg_prep.find_events(stim_channel='STI 014', consecutive=True, min_duration=.01)
     assert eeg_prep.events is not None
 
     eeg_prep.get_epochs(event_labels=['Stimulus'], tmin=-.5, tmax=2, baseline=(-.5, 0))
+
+    #TODISCUSS: Peter cannot fit ica components to epochs. raises an error RuntimeError: By default, MNE does not load data into main memory to conserve resources. inst.filter requires epochs data to be loaded. Use preload=True (or string) in the constructor or epochs.load_data().
+    #eeg_prep.find_ica_components(fit_on_epochs=False)
+    #eeg_prep.remove_ica_components(reject_from_file=False, reject_list_file_location='test_outputs')
+
+    eeg_prep.filters(low_freq=.1,high_freq=60, notch_freq=50)
+
+
+    #eeg_prep.deal_with_bad_channels(selection_method='automatic', threshold_sd_of_mean=40,
+    #                                interpolate=False, file_path=os.path.join('Data', 'bads'))
+
+    #eeg_prep.deal_with_bad_channels(selection_method='manual', threshold_sd_of_mean=40,
+    #                                interpolate=False, file_path=os.path.join('Data', 'bads'))
+
+    # Testing whether getting bad channels from the file also works:
+    eeg_prep.deal_with_bad_channels(selection_method='file', interpolate=True,
+                                    file_path=os.path.join('Data', 'bads'),plot=False)
+
     eeg_prep.deal_with_bad_epochs(selection_method='file', drop_epochs=True,
-                                  file_name='/Users/peterkraemer/PycharmProjects/EEG_Wizzardry/Data/prepared/test1')
+                                  file_path='/Users/peterkraemer/PycharmProjects/EEG_Wizzardry/Data/prepared/test1')
 
     # Saving data:
     eeg_prep.save_prepared_data(save_path=os.path.join('Data', 'prepared'),
