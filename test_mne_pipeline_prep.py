@@ -129,7 +129,7 @@ def test_pipeline_peter_dat():
     # TODO (Peter): Write a test for each method!
     trigger_dict = {'Stimulus': 36, 'Left_choice': 62, 'Right_choice': 64}
     # Reading in the data:
-    eeg_prep = mne_pipeline.EEGPrep(os.path.join('Data', 'raw', 'peter_raw.fif'), trigger_dict,participant_identifier='1')
+    eeg_prep = mne_pipeline.EEGPrep(os.path.join('Data', 'raw', 'peter_raw.fif'), trigger_dict, participant_identifier='1')
     print('Test result: defining eeg_prep object works')
 
     #assert isinstance(eeg_prep.raw, mne.io.fiff.raw.Raw)

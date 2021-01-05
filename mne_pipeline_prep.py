@@ -472,7 +472,7 @@ class EEGPrep(object):
                                 whitened=10.)
         if file_path is None:
             file_path = os.getcwd()
-            file_path = os.path.join(file_path, 'participant_{}_bad_epochs.csv'.format(self.participant_id))
+        file_path_and_name = os.path.join(file_path, 'participant_{}_bad_epochs.csv'.format(self.participant_id))
 
         epochs_copy = self.epochs.copy()
         if selection_method == 'automatic':
@@ -481,7 +481,7 @@ class EEGPrep(object):
             epochs_copy.plot(n_channels=68, scalings=scale_params, block=True)
             # TODO: Does the hand picking actually work here?
         elif selection_method == 'file':
-            epochs_to_be_dropped = pd.read_csv(file_path).epochs.to_list()
+            epochs_to_be_dropped = pd.read_csv(file_path_and_name).epochs.to_list()
             epochs_copy.drop(epochs_to_be_dropped)
         else:
             raise ValueError('Invalid selection method. Permitted methods are automatic, manual and file.')
@@ -493,11 +493,11 @@ class EEGPrep(object):
                 if self.epochs.drop_log[i] != epochs_copy.drop_log[i]:  # find index of epochs to be dropped
                     epochs_to_be_dropped.append(epoch_idx)
                 epoch_idx += 1
-        pd.DataFrame(epochs_to_be_dropped, columns=['epochs']).to_csv(file_path)
-        print('Saved to-be-dropped epochs to {}.'.format(file_path))
+        pd.DataFrame(epochs_to_be_dropped, columns=['epochs']).to_csv(file_path_and_name)
+        print('Saved to-be-dropped epochs to {}.'.format(file_path_and_name))
 
         if drop_epochs:
-            epochs_dropped = pd.read_csv(file_path).epochs.to_list()
+            epochs_dropped = pd.read_csv(file_path_and_name).epochs.to_list()
             self.epochs.drop(epochs_dropped)
 
         del epochs_copy
