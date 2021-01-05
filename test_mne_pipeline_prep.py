@@ -5,7 +5,6 @@ import pandas as pd
 
 
 def test_pipeline_kev_dat():
-    #TODISCUSS: Peter gets an AttributeError: 'EEGPrep' object has no attribute 'get_epochs_df' when running Kevins tests.
     trigger_dict = {'Masked': 2, 'Reveal': 4, 'Left_choice': 8, 'Right_choice': 16, 'No_choice': 32}
 
     # Reading in the data:
@@ -34,7 +33,8 @@ def test_pipeline_kev_dat():
 
     events_to_be_used = ['Left_choice', 'Right_choice']
     eeg_prep.get_epochs(event_labels=events_to_be_used, tmin=-1.5, tmax=.2, baseline=(-1.5, -1.2))
-    data_frame = eeg_prep.get_epochs_df(event_labels=events_to_be_used, tmin=-1.5, tmax=.2, baseline=(-1.5, -1.2))
+    data_frame = eeg_prep.get_epochs(event_labels=events_to_be_used, return_df=True, tmin=-1.5, tmax=.2,
+                                     baseline=(-1.5, -1.2))
     assert isinstance(data_frame, pd.DataFrame)
 
     # Assert that they have the same number of channels and number of events
