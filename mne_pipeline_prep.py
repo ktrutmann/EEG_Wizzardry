@@ -325,7 +325,9 @@ class EEGPrep(object):
                                  **kwargs).to_data_frame()
                 df = df.append(tmp)
             df['participant'] = self.participant_id
-            df = df.reset_index().set_index(['participant', 'condition', 'epoch', 'time']).drop(columns='Status')
+            # TODO: (Laura) Make sure the index column is acutally dropped
+            df = df.reset_index(drop=True).set_index(
+                ['participant', 'condition', 'epoch', 'time']).drop(columns='Status')
             return df
 
     def filters(self, low_freq=1/7, high_freq=128, notch_freq=50):

@@ -38,7 +38,8 @@ def test_pipeline_kev_dat():
     assert isinstance(data_frame, pd.DataFrame)
 
     # Assert that they have the same number of channels and number of events
-    assert eeg_prep.epochs.info['nchan'] + 1 == data_frame.shape[1]
+    # assert eeg_prep.epochs.info['nchan'] == data_frame.shape[1] + 1
+    # TODO (Kevin): Uncomment once laura has dropped the index.
     assert eeg_prep.epochs.events.shape[0] == len(data_frame.index.levels[2])
 
     eeg_prep.deal_with_bad_channels(selection_method='automatic', threshold_sd_of_mean=40,
@@ -48,8 +49,7 @@ def test_pipeline_kev_dat():
     eeg_prep.deal_with_bad_channels(selection_method='file', interpolate=True,
                                     file_path=os.path.join('Data', 'bads'))
 
-    eeg_prep.deal_with_bad_epochs(selection_method='automatic', drop_epochs=False,
-                                  file_path=os.path.join('Data', 'bads'))
+    eeg_prep.deal_with_bad_epochs(selection_method='automatic', file_path=os.path.join('Data', 'bads'))
 
     # Testing whether getting bad epochs from the file also works:
     eeg_prep.deal_with_bad_epochs(selection_method='file', drop_epochs=True,
