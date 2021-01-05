@@ -92,7 +92,7 @@ def test_pipeline_laura_dat():
                                      right_hand=['HeLi', 'VeDo'],
                                      left_hand=['VeUp', 'EMG1a']))
     
-    eeg_prep.set_montage()
+    data_preprocessed.set_montage()
     
     data_preprocessed.filters(low_freq=.1, high_freq=100, notch_freq=50)
     
@@ -103,19 +103,16 @@ def test_pipeline_laura_dat():
                         events=data_preprocessed.events)
     print("Size of epochs object with previously found events: ", epochs.get_data().shape)
     
-    epochs = data_preprocessed.get_epochs_df(event_labels=['start_choice', 'feedback'])
+    epochs = data_preprocessed.get_epochs(event_labels=['start_choice', 'feedback'],return_df=True)
     print("Index epochs df object (only 2 type of events): ", epochs.index)
     
     print("Bad channels before doing anything: ", data_preprocessed.raw.info['bads'])
     
     data_preprocessed.deal_with_bad_channels(selection_method='automatic',
                                              threshold_sd_of_mean=40,
-                                             event_labels=['show_options', 'start_choice', 'feedback'],
                                              file_path=os.path.join('Data', 'bads'),
                                              interpolate=False,
-                                             plot=True,
-                                             tmin=-.5,
-                                             tmax=3)
+                                             plot=True)
     print("Bad channels after automatic selection, no interpolation: ", data_preprocessed.raw.info['bads'])
     
     data_preprocessed.deal_with_bad_channels(selection_method='file',
@@ -132,7 +129,7 @@ def test_pipeline_peter_dat():
     # TODO (Peter): Write a test for each method!
     trigger_dict = {'Stimulus': 36, 'Left_choice': 62, 'Right_choice': 64}
     # Reading in the data:
-    eeg_prep = mne_pipeline.EEGPrep(os.path.join('Data', 'raw', 'peter_raw.fif'), trigger_dict,participant_identifier='xxx')
+    eeg_prep = mne_pipeline.EEGPrep(os.path.join('Data', 'raw', 'peter_raw.fif'), trigger_dict,participant_identifier='1')
     print('Test result: defining eeg_prep object works')
 
     #assert isinstance(eeg_prep.raw, mne.io.fiff.raw.Raw)
@@ -161,7 +158,7 @@ def test_pipeline_peter_dat():
     eeg_prep.find_events(stim_channel='STI 014', consecutive=True, min_duration=.01)
     assert eeg_prep.events is not None
 
-    eeg_prep.get_epochs(event_labels=['Stimulus'], tmin=-.5, tmax=2, baseline=(-.5, 0))
+    eeg_prep.get_epochs(event_labels=['Left_choice', 'Right_choice'], tmin=-1, tmax=.5, baseline=None)
 
     #TODISCUSS: Peter cannot fit ica components to epochs. raises an error RuntimeError: By default, MNE does not load data into main memory to conserve resources. inst.filter requires epochs data to be loaded. Use preload=True (or string) in the constructor or epochs.load_data().
     #eeg_prep.find_ica_components(fit_on_epochs=False)
@@ -185,4 +182,4 @@ def test_pipeline_peter_dat():
 
     # Saving data:
     eeg_prep.save_prepared_data(save_path=os.path.join('Data', 'prepared'),
-                                overwrite=True)
+                                overwrite=True,save_epochs=True)
