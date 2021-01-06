@@ -56,12 +56,10 @@ def test_pipeline_kev_dat():
                                   file_path=os.path.join('Data', 'bads'))
 
     # Saving data:
-    eeg_prep.save_prepared_data(save_path=os.path.join('Data', 'prepared'), save_epochs=True, save_events=True,
-                                overwrite=True)
+    eeg_prep.save_prepared_data(save_path=os.path.join('Data', 'prepared'), save_epochs=True, save_events=True)
 
 
 def test_pipeline_laura_dat():
-    #TODISCUSS: Peter cannot run Lauras pipeline. Pipeline doesn't define the eeg_prep object.
     events_id = dict(show_options=2,
                      start_choice=4,
                      end_choice=8,
@@ -75,22 +73,22 @@ def test_pipeline_laura_dat():
     assert isinstance(data_preprocessed.raw, mne.io.fiff.raw.Raw)
     
     data_preprocessed.fix_channels(
-        ext_ch_mapping = {'FT10': 'eog', 
-                          'PO10': 'eog', 
-                          'HeRe': 'eog', 
-                          'HeLi': 'emg', 
-                          'VeUp': 'emg', 
-                          'VeDo': 'emg',
-                          'EMG1a': 'emg', 
-                          'Status': 'resp'},
-        n_ext_channels = 9)
+        ext_ch_mapping={'FT10': 'eog',
+                        'PO10': 'eog',
+                        'HeRe': 'eog',
+                        'HeLi': 'emg',
+                        'VeUp': 'emg',
+                        'VeDo': 'emg',
+                        'EMG1a': 'emg',
+                        'Status': 'resp'},
+        n_ext_channels=9)
     
-    data_preprocessed.set_references(ref_ch = ['FT9', 'PO9'], 
-                                     bipolar_dict = dict(
-                                     eye_horizontal=['PO10', 'FT10'],
-                                     eye_vertical=['HeRe', 'FT10'],
-                                     right_hand=['HeLi', 'VeDo'],
-                                     left_hand=['VeUp', 'EMG1a']))
+    data_preprocessed.set_references(ref_ch=['FT9', 'PO9'],
+                                     bipolar_dict=dict(
+                                         eye_horizontal=['PO10', 'FT10'],
+                                         eye_vertical=['HeRe', 'FT10'],
+                                         right_hand=['HeLi', 'VeDo'],
+                                         left_hand=['VeUp', 'EMG1a']))
     
     data_preprocessed.set_montage()
     
@@ -103,7 +101,7 @@ def test_pipeline_laura_dat():
                         events=data_preprocessed.events)
     print("Size of epochs object with previously found events: ", epochs.get_data().shape)
     
-    epochs = data_preprocessed.get_epochs(event_labels=['start_choice', 'feedback'],return_df=True)
+    epochs = data_preprocessed.get_epochs(event_labels=['start_choice', 'feedback'], return_df=True)
     print("Index epochs df object (only 2 type of events): ", epochs.index)
     
     print("Bad channels before doing anything: ", data_preprocessed.raw.info['bads'])
@@ -123,16 +121,16 @@ def test_pipeline_laura_dat():
     
     data_preprocessed.find_ica_components()
     data_preprocessed.remove_ica_components(reject_from_file=False, reject_list_file_location='test_outputs')
+
+    data_preprocessed.save_prepared_data(save_path=os.path.join('Data', 'prepared'), save_epochs=True, save_events=True)
     
     
 def test_pipeline_peter_dat():
-    # TODO (Peter): Write a test for each method!
     trigger_dict = {'Stimulus': 36, 'Left_choice': 62, 'Right_choice': 64}
     # Reading in the data:
-    eeg_prep = mne_pipeline.EEGPrep(os.path.join('Data', 'raw', 'peter_raw.fif'), trigger_dict, participant_identifier='1')
-    print('Test result: defining eeg_prep object works')
+    eeg_prep = mne_pipeline.EEGPrep(os.path.join('Data', 'raw', 'peter_raw.fif'), trigger_dict,
+                                    participant_identifier='1')
 
-    #assert isinstance(eeg_prep.raw, mne.io.fiff.raw.Raw)
     eeg_prep.fix_channels(n_ext_channels=10,
                           ext_ch_mapping={'EMG1a': 'emg',
                                           'EMG1b': 'emg',
@@ -145,41 +143,38 @@ def test_pipeline_peter_dat():
                                           'STI 014': 'resp'})
     assert isinstance(eeg_prep.raw, mne.io.fiff.raw.Raw)
 
-    eeg_prep.set_montage(montage_path='/usr/local/lib/python3.7/site-packages/mne/channels/data/montages', montage_kind='biosemi64')
-    #assert eeg_prep.ica is not None
-
     eeg_prep.set_references(ref_ch=['PO9', 'FT9'], bipolar_dict=dict(
                                               eye_horizontal=['HeRe', 'HeLi'],
                                               eye_vertical=['VeUp', 'VeDo'],
                                               right_hand=['PO10', 'FT10'],
                                               left_hand=['EMG1b', 'EMG1a']))
 
+    eeg_prep.set_montage()
 
     eeg_prep.find_events(stim_channel='STI 014', consecutive=True, min_duration=.01)
     assert eeg_prep.events is not None
 
     eeg_prep.get_epochs(event_labels=['Left_choice', 'Right_choice'], tmin=-1, tmax=.5, baseline=None)
 
-    #TODISCUSS: Peter cannot fit ica components to epochs. raises an error RuntimeError: By default, MNE does not load data into main memory to conserve resources. inst.filter requires epochs data to be loaded. Use preload=True (or string) in the constructor or epochs.load_data().
-    #eeg_prep.find_ica_components(fit_on_epochs=False)
-    #eeg_prep.remove_ica_components(reject_from_file=False, reject_list_file_location='test_outputs')
+    eeg_prep.find_ica_components(fit_on_epochs=False)
+    eeg_prep.remove_ica_components(reject_from_file=False, reject_list_file_location='test_outputs')
 
-    eeg_prep.filters(low_freq=.1,high_freq=60, notch_freq=50)
+    eeg_prep.filters(low_freq=.1, high_freq=60, notch_freq=50)
 
+    eeg_prep.deal_with_bad_channels(selection_method='automatic', threshold_sd_of_mean=40,
+                                    interpolate=False, file_path=os.path.join('Data', 'bads'))
 
-    #eeg_prep.deal_with_bad_channels(selection_method='automatic', threshold_sd_of_mean=40,
-    #                                interpolate=False, file_path=os.path.join('Data', 'bads'))
-
-    #eeg_prep.deal_with_bad_channels(selection_method='manual', threshold_sd_of_mean=40,
-    #                                interpolate=False, file_path=os.path.join('Data', 'bads'))
+    eeg_prep.deal_with_bad_channels(selection_method='manual', threshold_sd_of_mean=40,
+                                    interpolate=False, file_path=os.path.join('Data', 'bads'))
 
     # Testing whether getting bad channels from the file also works:
     eeg_prep.deal_with_bad_channels(selection_method='file', interpolate=True,
-                                    file_path=os.path.join('Data', 'bads'),plot=False)
+                                    file_path=os.path.join('Data', 'bads'), plot=False)
+
+    eeg_prep.deal_with_bad_epochs(selection_method='manual', file_path=os.path.join('Data', 'prepared'))
 
     eeg_prep.deal_with_bad_epochs(selection_method='file', drop_epochs=True,
-                                  file_path='/Users/peterkraemer/PycharmProjects/EEG_Wizzardry/Data/prepared/test1')
+                                  file_path=os.path.join('Data', 'prepared'))
 
     # Saving data:
-    eeg_prep.save_prepared_data(save_path=os.path.join('Data', 'prepared'),
-                                overwrite=True,save_epochs=True)
+    eeg_prep.save_prepared_data(save_path=os.path.join('Data', 'prepared'), save_epochs=True)

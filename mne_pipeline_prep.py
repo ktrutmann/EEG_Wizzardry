@@ -149,7 +149,6 @@ class EEGPrep(object):
                 montage = mne.channels.read_montage(kind=montage_kind, path=montage_path)
             except:
                 montage = mne.channels.read_custom_montage(fname=montage_path)
-        # TODO: needs to be tested for mne versions > 0.17
 
         # Needs to be able to handle different mne versions:
         self.raw.set_montage(montage)
@@ -285,6 +284,7 @@ class EEGPrep(object):
         if self.epochs is not None:
             print('Applying ICA to the epoched data excluding the following components: {}'.format(
                 self.ica.exclude))
+            self.epochs.load_data()
             self.ica.apply(self.epochs, exclude=self.ica.exclude, **kwargs)
 
     def get_epochs(self, event_labels, return_df=False, **kwargs):
@@ -295,6 +295,9 @@ class EEGPrep(object):
         ----------
         event_labels: array or list
             Labels corresponding to the events that you want to select.
+
+        return_df: bool
+            If set to True, the method will return a pandas DataFrame of the Epochs created.
 
         kwargs : keyword arguments
             All keyword arguments are passed to mne.Epochs().
@@ -325,7 +328,7 @@ class EEGPrep(object):
                                  **kwargs).to_data_frame()
                 df = df.append(tmp)
             df['participant'] = self.participant_id
-            # TODO: (Laura) Make sure the index column is acutally dropped
+            # TODO: (Laura) Make sure the index column is actually dropped
             df = df.reset_index(drop=True).set_index(
                 ['participant', 'condition', 'epoch', 'time']).drop(columns='Status')
             return df
@@ -415,7 +418,7 @@ class EEGPrep(object):
 
         elif selection_method == "file":
             bads = pd.read_csv(file_name)
-            self.raw.info['bads'] = bads['bad_channels'].values
+            self.raw.info['bads'] = list(bads['bad_channels'].values)
 
             print("Marked as bad: ", self.raw.info['bads'])
 
@@ -506,6 +509,7 @@ class EEGPrep(object):
         """
         This method saves the prepared raw data and (optionally) the epochs.
         It can also save the events as a pickle file so it can easily be reused later.
+        This method will overwrite previous files with the same name.
 
         Parameters
         ----------
@@ -524,7 +528,7 @@ class EEGPrep(object):
         """
 
         file_path_and_name = os.path.join(save_path, 'participant_{}_prepared_raw.fif'.format(self.participant_id))
-        self.raw.save(file_path_and_name, **kwargs)
+        self.raw.save(file_path_and_name, overwrite=True, **kwargs)
         print('Saved the prepared raw file to {}.'.format(file_path_and_name))
 
         if save_events:
@@ -543,4 +547,4 @@ class EEGPrep(object):
                                      'Create them by running the make_epochs() method first.')
 
             file_path_and_name = os.path.join(save_path, 'participant_{}-epo.fif'.format(self.participant_id))
-            self.epochs.save(file_path_and_name)
+            self.epochs.save(file_path_and_name, overwrite=True)
